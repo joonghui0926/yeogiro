@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Figure 1 — 통화 플로우</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root { --ink:#1a1a1a; --mut:#6b6b6b; --line:#555; --soft:#efefec; --accent:#1e6b4f; --accent-bg:#e6f0eb; --amber:#9a5418; }
+  * { margin:0; box-sizing:border-box; }
+  body { background:#fff; font-family:"IBM Plex Sans KR",sans-serif; color:var(--ink); }
+  .fig { width:880px; padding:40px 44px 36px; }
+  .cap { margin-top:16px; font-size:14.5px; color:var(--mut); line-height:1.65; max-width:86ch; }
+  .cap b { color:var(--ink); font-weight:600; }
+  svg { display:block; }
+  .box { fill:#fff; stroke:var(--line); stroke-width:1.4; }
+  .box-accent { fill:var(--accent-bg); stroke:var(--accent); stroke-width:1.8; }
+  .term { fill:var(--soft); stroke:var(--line); stroke-width:1.4; }
+  .diam { fill:#fff; stroke:var(--line); stroke-width:1.6; }
+  .ln { fill:none; stroke:var(--line); stroke-width:1.5; }
+  .ln-a { fill:none; stroke:var(--accent); stroke-width:2.2; }
+  .ln-am { fill:none; stroke:var(--amber); stroke-width:1.5; stroke-dasharray:5 4; }
+  .t { font-size:15px; font-weight:600; fill:var(--ink); }
+  .s { font-size:12.5px; fill:var(--mut); }
+  .m { font-family:"IBM Plex Mono",monospace; font-size:11.5px; fill:var(--mut); }
+  .lb { font-size:12px; fill:var(--mut); }
+  .lb-a { font-size:12.5px; font-weight:600; fill:var(--accent); }
+  .lb-am { font-size:12px; font-weight:600; fill:var(--amber); }
+  .num { font-family:"IBM Plex Mono",monospace; font-size:12.5px; fill:#aaa; }
+</style>
+</head>
+<body>
+<div class="fig">
+<svg width="700" height="1150" viewBox="0 0 700 1150" font-family="IBM Plex Sans KR">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#555"/></marker>
+    <marker id="aa" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#1e6b4f"/></marker>
+    <marker id="am" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9a5418"/></marker>
+  </defs>
+
+  <!-- vertical connectors -->
+  <path class="ln" d="M330 86V110" marker-end="url(#a)"/>
+  <path class="ln" d="M330 166V190" marker-end="url(#a)"/>
+  <path class="ln" d="M330 246V270" marker-end="url(#a)"/>
+  <path class="ln" d="M330 350V374" marker-end="url(#a)"/>
+  <path class="ln" d="M330 430V454" marker-end="url(#a)"/>
+  <path class="ln-a" d="M330 606V630" marker-end="url(#aa)"/>
+  <path class="ln" d="M330 686V710" marker-end="url(#a)"/>
+  <path class="ln" d="M330 766V790" marker-end="url(#a)"/>
+  <path class="ln-a" d="M330 934V958" marker-end="url(#aa)"/>
+  <path class="ln" d="M330 1014V1038" marker-end="url(#a)"/>
+
+  <!-- consent NO loop -->
+  <path class="ln" d="M440 530H566V400H482" marker-end="url(#a)"/>
+  <text class="lb" x="574" y="452">아니오 —</text>
+  <text class="lb" x="574" y="470">재확인 ·</text>
+  <text class="lb" x="574" y="488">조건 변경</text>
+  <text class="lb-a" x="312" y="624" text-anchor="end">예</text>
+
+  <!-- payment timeout -->
+  <path class="ln-am" d="M440 862H612V1074H514" marker-end="url(#am)"/>
+  <text class="lb-am" x="620" y="930">시간 초과 —</text>
+  <text class="lb-am" x="620" y="948">자리 해제</text>
+  <text class="lb-a" x="312" y="952" text-anchor="end">예</text>
+
+  <!-- 1 -->
+  <rect class="term" x="180" y="30" width="300" height="56" rx="28"/>
+  <text class="t" x="330" y="63" text-anchor="middle">어르신이 번호로 전화</text>
+
+  <!-- 2 -->
+  <rect class="box" x="180" y="110" width="300" height="56" rx="10"/>
+  <text class="t" x="330" y="133" text-anchor="middle">테스터 PWA · 삼성 전화 화면</text>
+  <text class="s" x="330" y="152" text-anchor="middle">음성을 WebRTC로 연결</text>
+
+  <!-- 3 -->
+  <rect class="box" x="180" y="190" width="300" height="56" rx="10"/>
+  <text class="t" x="330" y="213" text-anchor="middle">OpenAI 음성 AI</text>
+  <text class="m" x="330" y="232" text-anchor="middle">gpt-realtime-2.1 · 사이드밴드 WS</text>
+
+  <!-- 4 -->
+  <rect class="box" x="168" y="270" width="324" height="80" rx="10"/>
+  <text class="t" x="330" y="298" text-anchor="middle">여기로 서버 — 발화 해석 → find_trains</text>
+  <text class="s" x="330" y="318" text-anchor="middle">해석은 AI, 날짜·랭킹·운임은 코드</text>
+  <text class="m" x="330" y="337" text-anchor="middle">공공데이터 TAGO 실시간 시간표</text>
+
+  <!-- 5 -->
+  <rect class="box" x="180" y="374" width="300" height="56" rx="10"/>
+  <text class="t" x="330" y="397" text-anchor="middle">AI가 열차 1개 제안</text>
+  <text class="s" x="330" y="416" text-anchor="middle">“… 예약할까요?”</text>
+
+  <!-- diamond consent -->
+  <polygon class="diam" points="330,454 440,530 330,606 220,530"/>
+  <text class="t" x="330" y="524" text-anchor="middle">동의?</text>
+  <text class="s" x="330" y="543" text-anchor="middle">확인 모델 + 8조건</text>
+
+  <!-- 7 -->
+  <rect class="box" x="180" y="630" width="300" height="56" rx="10"/>
+  <text class="t" x="330" y="653" text-anchor="middle">좌석 확보 · 조중휘 계정</text>
+  <text class="s" x="330" y="672" text-anchor="middle">미결제 예약</text>
+
+  <!-- 8 payment -->
+  <rect class="box-accent" x="180" y="710" width="300" height="56" rx="10"/>
+  <text class="t" x="330" y="733" text-anchor="middle">결제 요청 → 카카오페이 결제창</text>
+  <text class="s" x="330" y="752" text-anchor="middle">어르신이 노란 버튼 탭</text>
+
+  <!-- diamond paid -->
+  <polygon class="diam" points="330,790 440,862 330,934 220,862"/>
+  <text class="t" x="330" y="856" text-anchor="middle">결제 승인?</text>
+  <text class="s" x="330" y="875" text-anchor="middle">90초 내</text>
+
+  <!-- 10 sms -->
+  <rect class="box" x="180" y="958" width="300" height="56" rx="10"/>
+  <text class="t" x="330" y="981" text-anchor="middle">승차권 문자 발송</text>
+  <text class="s" x="330" y="1000" text-anchor="middle">삼성 메시지 화면 · 링크 없음</text>
+
+  <!-- 11 terminal -->
+  <rect class="term" x="150" y="1038" width="360" height="72" rx="20"/>
+  <text class="t" x="330" y="1066" text-anchor="middle">통화 종료 · 기록 저장</text>
+  <text class="s" x="330" y="1086" text-anchor="middle">테스트 예약 자동 취소 · 콘솔에 자막·도구·게이트 기록</text>
+
+  <!-- step numbers, left gutter -->
+  <text class="num" x="150" y="142" text-anchor="end">01</text>
+  <text class="num" x="150" y="222" text-anchor="end">02</text>
+  <text class="num" x="150" y="314" text-anchor="end">03</text>
+  <text class="num" x="150" y="406" text-anchor="end">04</text>
+  <text class="num" x="198" y="534" text-anchor="end">05</text>
+  <text class="num" x="150" y="662" text-anchor="end">06</text>
+  <text class="num" x="150" y="742" text-anchor="end">07</text>
+  <text class="num" x="198" y="866" text-anchor="end">08</text>
+  <text class="num" x="150" y="990" text-anchor="end">09</text>
+</svg>
+<div class="cap"><b>Figure 1. 여기로 통화 플로우.</b> 어르신의 음성은 WebRTC로 OpenAI 음성 AI에 연결되고, 여기로 서버가 사이드밴드로 붙어 도구를 실행한다. 해석은 AI가, 날짜·랭킹·운임 계산은 코드가 맡는다(①–④). 제안 뒤 어르신의 대답은 음성 모델과 독립된 확인 모델과 8개 조건을 통과해야만 좌석 확보로 이어진다(⑤–⑥). 결제는 카카오페이 결제창의 명시적 탭으로만 승인되며, 90초 내 미승인 시 좌석을 해제하고 종료한다(⑦–⑧). 승인되면 승차권 문자를 보내고, 통화 종료 후 테스트 예약을 자동 취소한다(⑨). 초록 경로만 좌석·결제를 움직인다.</div>
+</div>
+</body>
+</html>

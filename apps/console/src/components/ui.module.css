@@ -1,0 +1,326 @@
+.page {
+  display: grid;
+  gap: 40px;
+  max-width: 1160px;
+}
+
+.pageHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.pageSub {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.section {
+  display: grid;
+  gap: 16px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.sectionHint {
+  margin: -10px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.kpi {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px 24px 20px;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.kpiLabel {
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.kpiValue {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiUnit {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-left: 2px;
+}
+
+.kpiGoal {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.kpiGoal b {
+  font-weight: 600;
+}
+
+.good {
+  color: var(--accent);
+}
+
+.bad {
+  color: var(--danger);
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 13px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--sunken);
+  color: var(--ink-2);
+}
+
+.chipGood {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.chipWarn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.chipBad {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.chipInfo {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+.liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.table th {
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 0 16px 10px;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 0 16px;
+  height: 56px;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.table tbody tr {
+  cursor: pointer;
+}
+
+.table tbody tr td:first-child {
+  border-radius: 12px 0 0 12px;
+}
+
+.table tbody tr td:last-child {
+  border-radius: 0 12px 12px 0;
+}
+
+.table tbody tr:hover td {
+  background: var(--hover);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter,
+.filterOn {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 18px;
+  border: 0;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 550;
+  box-shadow: var(--shadow);
+}
+
+.filterOn {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.barList {
+  display: grid;
+  gap: 14px;
+}
+
+.barRow {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.barTrack {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--sunken);
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 5px;
+  background: var(--accent);
+}
+
+.barValue {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 15px;
+  padding: 32px 0;
+  text-align: center;
+}
+
+.button,
+.buttonPrimary,
+.buttonDanger {
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 12px;
+  border: 0;
+  font-weight: 600;
+  font-size: 15px;
+  background: var(--sunken);
+  color: var(--ink);
+}
+
+.buttonPrimary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.buttonDanger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.input {
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 0;
+  background: var(--sunken);
+  font-size: 16px;
+  min-width: 0;
+}
+
+@media (max-width: 1080px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 820px) {
+  .page {
+    gap: 32px;
+  }
+  .pageTitle {
+    font-size: 24px;
+  }
+  .kpi {
+    padding: 18px;
+  }
+  .kpiValue {
+    font-size: 28px;
+  }
+  .card {
+    padding: 18px;
+  }
+}

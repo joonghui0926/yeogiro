@@ -1,0 +1,18 @@
+{
+  "name": "yeogiro",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:phone": "npm run dev -w @yeogiro/phone",
+    "dev:console": "npm run dev -w @yeogiro/console",
+    "build": "npm run build -w @yeogiro/phone && npm run build -w @yeogiro/console",
+    "typecheck": "npm run typecheck -w @yeogiro/phone && npm run typecheck -w @yeogiro/console",
+    "deploy:web": "npm run build && firebase deploy --only hosting,firestore"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^23.11.1"
+  }
+}

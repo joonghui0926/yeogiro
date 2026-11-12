@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>여기로 프로토타입 파이프라인</title>
+<link rel="icon" href="../apps/phone/public/icons/icon-64.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+:root {
+  --bg: #F6F4EF;
+  --surface: #FFFFFF;
+  --tint: #ECEAE3;
+  --ink: #1A1F1C;
+  --muted: #5E6862;
+  --line: #BFC6C0;
+  --accent: #1F5B45;
+  --accent-soft: #E1ECE5;
+  --sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101412; --surface: #171C19; --tint: #1D2420; --ink: #E6EAE7; --muted: #9AA59F;
+    --line: #3A4540; --accent: #62C49C; --accent-soft: #173529; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101412; --surface: #171C19; --tint: #1D2420; --ink: #E6EAE7; --muted: #9AA59F;
+  --line: #3A4540; --accent: #62C49C; --accent-soft: #173529; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.7 var(--sans);
+  word-break: keep-all;
+  padding: 48px max(16px, env(safe-area-inset-right)) 96px max(16px, env(safe-area-inset-left));
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 72px; }
+
+header { display: grid; gap: 14px; max-width: 68ch; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--accent); }
+.brand-mark {
+  width: 28px; height: 28px; border-radius: 7px; background: #1F5B45; color: #F3EEDF;
+  display: grid; place-items: center; font-size: 17px; font-weight: 700;
+}
+h1 { margin: 0; font-size: clamp(30px, 4.6vw, 42px); line-height: 1.2; letter-spacing: -0.015em; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); font-size: 17.5px; }
+.lede strong { color: var(--ink); font-weight: 600; }
+
+section { display: grid; gap: 20px; }
+h2 { margin: 0; font-size: 23px; font-weight: 600; letter-spacing: -0.01em; }
+.intro { margin: 0; max-width: 66ch; color: var(--muted); }
+
+figure { margin: 0; display: grid; gap: 14px; }
+.canvas { overflow-x: auto; background: var(--surface); border-radius: 14px; padding: 12px; }
+.canvas svg { display: block; width: 100%; min-width: 980px; height: auto; }
+figcaption { color: var(--muted); font-size: 15px; max-width: 78ch; }
+figcaption b { color: var(--accent); font-weight: 600; }
+
+.d-box { fill: var(--surface); stroke: var(--line); stroke-width: 1.25; }
+.d-phone { fill: var(--surface); stroke: var(--ink); stroke-width: 1.6; }
+.d-chip { fill: var(--tint); }
+.d-group { fill: var(--tint); }
+.d-acc { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2; }
+.d-line { fill: none; stroke: var(--muted); stroke-width: 1.4; }
+.d-line-acc { fill: none; stroke: var(--accent); stroke-width: 2.2; }
+.d-head { fill: var(--muted); }
+.d-head-acc { fill: var(--accent); }
+.d-name { fill: var(--ink); font: 600 15px var(--sans); }
+.d-sub { fill: var(--muted); font: 12.5px var(--sans); }
+.d-chip-t { fill: var(--ink); font: 500 12.5px var(--sans); }
+.d-mono { fill: var(--muted); font: 11.5px var(--mono); }
+.d-lab { fill: var(--muted); font: 12px var(--sans); }
+.d-lab-acc { fill: var(--accent); font: 600 12px var(--sans); }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; counter-reset: s; }
+.steps li {
+  display: grid; grid-template-columns: 2.4rem 7rem minmax(0, 1fr); gap: 16px; align-items: baseline;
+  padding: 14px 18px; border-radius: 10px;
+}
+.steps li:nth-child(odd) { background: var(--surface); }
+.steps li::before {
+  counter-increment: s; content: counter(s, decimal-leading-zero);
+  font: 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.steps li.gate { background: var(--accent-soft); }
+.steps .k { font-weight: 600; }
+.steps .v { min-width: 0; }
+.steps .who { display: block; font-size: 13.5px; color: var(--muted); margin-top: 2px; }
+.steps li.gate .k { color: var(--accent); }
+q { quotes: "“" "”"; }
+code { font: 0.88em var(--mono); background: var(--tint); padding: 2px 6px; border-radius: 5px; }
+
+.sound { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 28px 40px; }
+.sound div { display: grid; gap: 4px; }
+.sound h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.sound p { margin: 0; color: var(--muted); }
+
+.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+.panel { background: var(--surface); border-radius: 14px; padding: 24px 26px; display: grid; gap: 12px; align-content: start; }
+.panel.real { background: var(--accent-soft); }
+.panel h3 { margin: 0; font-size: 17px; font-weight: 600; }
+.panel.real h3 { color: var(--accent); }
+.panel ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; }
+.panel li span { color: var(--muted); }
+
+.modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+.mode { background: var(--surface); border-radius: 14px; padding: 22px 24px; display: grid; gap: 8px; align-content: start; }
+.mode .tag { font: 500 13px var(--mono); color: var(--accent); letter-spacing: 0.04em; }
+.mode h3 { margin: 0; font-size: 17px; font-weight: 600; }
+.mode p { margin: 0; color: var(--muted); }
+
+footer { color: var(--muted); font-size: 14px; }
+footer a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 680px) {
+  .wrap { gap: 56px; }
+  .steps li { grid-template-columns: 2rem minmax(0, 1fr); row-gap: 2px; padding: 14px; }
+  .steps li .k, .steps li .v { grid-column: 2; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand"><span class="brand-mark" aria-hidden="true">路</span>여기로 · 11주차 프로토타입</div>
+    <h1>폰 화면은 가짜, 대화와 예약은 진짜</h1>
+    <p class="lede">테스터 폰에 설치한 <strong>여기로</strong> 앱이 삼성 전화 앱과 똑같이 보이고, 전화를 걸면 OpenAI 음성 AI가 받습니다. <strong>"응" 한 번이면 조중휘 코레일 계정으로 실제 좌석을 잡고</strong>, 원터치 결제 화면과 삼성 메시지 화면까지 이어집니다.</p>
+  </header>
+
+  <figure>
+    <div class="canvas">
+      <svg viewBox="0 0 1200 556" role="img" aria-label="테스터 폰은 WebRTC로 OpenAI 음성 AI와 연결되고, 여기로 서버가 사이드밴드로 붙어 도구와 동의 게이트를 실행합니다. 모든 이벤트는 Firestore에 쌓이고, 폰은 결제 시트와 문자를, 운영 콘솔은 통화 기록을 실시간으로 받습니다. 코레일 호출은 팀 노트북의 작업자가 작업 큐를 받아 처리합니다.">
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-head" d="M0 0L10 5L0 10z"/></marker>
+          <marker id="arr-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-head-acc" d="M0 0L10 5L0 10z"/></marker>
+        </defs>
+
+        <rect class="d-group" x="580" y="124" width="300" height="296" rx="12"/>
+        <text class="d-name" x="598" y="150">여기로 서버</text>
+        <text class="d-mono" x="862" y="150" text-anchor="end">Cloud Run · FastAPI</text>
+
+        <path class="d-line" d="M115 150V60H598" marker-start="url(#arr)" marker-end="url(#arr)"/>
+        <path class="d-line" d="M730 96V160" marker-start="url(#arr)" marker-end="url(#arr)"/>
+        <path class="d-line" d="M210 372H598" marker-end="url(#arr)"/>
+        <path class="d-line" d="M210 306H598" marker-start="url(#arr)" marker-end="url(#arr)"/>
+        <path class="d-line" d="M730 420V468" marker-end="url(#arr)"/>
+        <path class="d-line" d="M860 188H958" marker-end="url(#arr)"/>
+        <path class="d-line-acc" d="M880 490H920V296H958" marker-start="url(#arr-acc)" marker-end="url(#arr-acc)"/>
+        <path class="d-line" d="M1070 324V358" marker-start="url(#arr)" marker-end="url(#arr)"/>
+        <path class="d-line" d="M880 514H958" marker-end="url(#arr)"/>
+
+        <rect class="d-phone" x="20" y="150" width="190" height="234" rx="18"/>
+        <text class="d-name" x="115" y="182" text-anchor="middle">테스터 폰</text>
+        <text class="d-sub" x="115" y="202" text-anchor="middle">PWA 여기로 · 삼성 화면</text>
+        <rect class="d-chip" x="36" y="222" width="158" height="30" rx="7"/>
+        <text class="d-chip-t" x="115" y="242" text-anchor="middle">키패드 · 연락처</text>
+        <rect class="d-chip" x="36" y="260" width="158" height="30" rx="7"/>
+        <text class="d-chip-t" x="115" y="280" text-anchor="middle">발신 · 통화 중</text>
+        <rect class="d-chip" x="36" y="298" width="158" height="30" rx="7"/>
+        <text class="d-chip-t" x="115" y="318" text-anchor="middle">원터치 결제 시트</text>
+        <rect class="d-chip" x="36" y="336" width="158" height="30" rx="7"/>
+        <text class="d-chip-t" x="115" y="356" text-anchor="middle">삼성 메시지</text>
+
+        <rect class="d-box" x="600" y="24" width="260" height="72" rx="10"/>
+        <text class="d-name" x="730" y="54" text-anchor="middle">OpenAI 음성 AI</text>
+        <text class="d-mono" x="730" y="78" text-anchor="middle">gpt-realtime-2.1 · WebRTC</text>
+
+        <rect class="d-box" x="600" y="162" width="260" height="52" rx="9"/>
+        <text class="d-name" x="730" y="184" text-anchor="middle">통화 흐름</text>
+        <text class="d-sub" x="730" y="203" text-anchor="middle">자막 · 도구 · 침묵 타이머 · 상태기계</text>
+
+        <rect class="d-acc" x="600" y="226" width="260" height="52" rx="9"/>
+        <text class="d-name" x="730" y="248" text-anchor="middle">동의 게이트</text>
+        <text class="d-sub" x="730" y="267" text-anchor="middle">확인 모델 + 조건 8개</text>
+
+        <rect class="d-box" x="600" y="290" width="260" height="52" rx="9"/>
+        <text class="d-name" x="730" y="312" text-anchor="middle">결제 요청 · 문자</text>
+        <text class="d-sub" x="730" y="331" text-anchor="middle">원터치 요청 · 문자함 기록</text>
+
+        <rect class="d-box" x="600" y="354" width="260" height="52" rx="9"/>
+        <text class="d-name" x="730" y="376" text-anchor="middle">통화 시작</text>
+        <text class="d-sub" x="730" y="395" text-anchor="middle">테스터 확인 · 세션 키 발급</text>
+
+        <rect class="d-box" x="580" y="470" width="300" height="64" rx="10"/>
+        <text class="d-name" x="730" y="497" text-anchor="middle">Firestore</text>
+        <text class="d-sub" x="730" y="517" text-anchor="middle">통화 기록 · 결제 요청 · 문자함 · 작업 큐</text>
+
+        <rect class="d-box" x="960" y="162" width="220" height="52" rx="9"/>
+        <text class="d-name" x="1070" y="184" text-anchor="middle">공공데이터 TAGO</text>
+        <text class="d-sub" x="1070" y="203" text-anchor="middle">시간표 · 운임 · 예비 조회</text>
+
+        <rect class="d-box" x="960" y="268" width="220" height="56" rx="9"/>
+        <text class="d-name" x="1070" y="292" text-anchor="middle">코레일 작업자</text>
+        <text class="d-sub" x="1070" y="312" text-anchor="middle">조중휘 노트북 · 계정은 여기만</text>
+
+        <rect class="d-box" x="960" y="360" width="220" height="78" rx="9"/>
+        <text class="d-name" x="1070" y="386" text-anchor="middle">코레일</text>
+        <text class="d-sub" x="1070" y="406" text-anchor="middle">조중휘 계정 · 실제 예약</text>
+        <text class="d-mono" x="1070" y="426" text-anchor="middle">AUTO · ASSIST · MOCK</text>
+
+        <rect class="d-box" x="960" y="470" width="220" height="64" rx="10"/>
+        <text class="d-name" x="1070" y="497" text-anchor="middle">운영 콘솔</text>
+        <text class="d-sub" x="1070" y="517" text-anchor="middle">웹 · 모바일 PWA</text>
+
+        <text class="d-lab" x="356" y="52" text-anchor="middle">음성 · WebRTC</text>
+        <text class="d-lab" x="742" y="114">사이드밴드</text>
+        <text class="d-lab" x="404" y="364" text-anchor="middle">통화 시작 요청</text>
+        <text class="d-lab" x="404" y="298" text-anchor="middle">결제 시트 · 문자 (SSE) / 결제 탭</text>
+        <text class="d-lab" x="742" y="448">모든 이벤트 기록</text>
+        <text class="d-lab" x="909" y="180" text-anchor="middle">예비 조회</text>
+        <text class="d-lab-acc" x="914" y="452" text-anchor="end">작업 큐</text>
+        <text class="d-lab" x="1080" y="346">조회·예약·취소</text>
+        <text class="d-lab" x="919" y="532" text-anchor="middle">실시간</text>
+      </svg>
+    </div>
+    <figcaption><b>초록 상자와 선만 좌석을 움직입니다.</b> 조회는 바로 나가지만, 예약 작업은 어르신의 "응"을 확인 모델이 동의로 판정하고 조건 8개를 통과해야 작업 큐에 들어갑니다. OpenAI는 말만 하고 코레일·결제·문자에는 닿지 않습니다. 코레일 계정 정보는 조중휘 노트북 밖으로 나가지 않습니다.</figcaption>
+  </figure>
+
+  <section>
+    <h2>한 통화의 순서</h2>
+    <p class="intro">재이용 고객이면 어르신이 하는 일은 말 두 번과 탭 한 번입니다. 4·7·10번입니다.</p>
+    <ol class="steps">
+      <li><span class="k">발신</span><span class="v">키패드에서 번호를 누르거나 연락처의 "여기로 기차예약"을 누릅니다. 발신 화면과 링백음이 나오는 동안 서버가 세션 키를 발급하고 WebRTC가 연결됩니다.<span class="who">폰 → 서버 → OpenAI</span></span></li>
+      <li><span class="k">연결</span><span class="v">링백이 멈추고 통화 시간이 흐르기 시작합니다. 서버가 사이드밴드로 붙어 자막과 도구 호출을 받습니다.<span class="who">서버</span></span></li>
+      <li><span class="k">첫마디</span><span class="v"><q>여기로 기차 예약 AI예요. 어디로, 언제 가세요?</q><span class="who">AI</span></span></li>
+      <li><span class="k">요청</span><span class="v"><q>담주 화욜 오후에 서울 좀 가려고</q><span class="who">어르신</span></span></li>
+      <li><span class="k">조회</span><span class="v"><q>잠시만요, 찾아볼게요.</q> 후 <code>find_trains</code>. 날짜는 코드가 다시 계산하고, 코레일 작업자가 잔여석까지 조회합니다. 노트북이 응답하지 않으면 공공데이터로 조회합니다.<span class="who">서버 → 작업 큐 → 코레일</span></span></li>
+      <li><span class="k">제안</span><span class="v">코드가 만든 문장을 그대로 읽습니다. 날짜·구간·출발·도착·금액, 12초 이하, <q>예약할까요?</q>로 끝냅니다.<span class="who">AI</span></span></li>
+      <li class="gate"><span class="k">동의</span><span class="v"><q>응</q>을 확인 모델이 동의로 판정하고 조건 8개를 통과하면 <code>request_booking</code>이 실행됩니다. <q>응?</q>은 동의가 아니라 열차만 짧게 다시 묻습니다.<span class="who">어르신 → 게이트</span></span></li>
+      <li><span class="k">좌석 확보</span><span class="v">조중휘 계정으로 미결제 예약을 겁니다. 4초가 넘으면 8초마다 <q>자리 잡는 중이에요.</q><span class="who">작업자 → 코레일</span></span></li>
+      <li><span class="k">결제 요청</span><span class="v">통화 화면 위로 결제 알림이 뜹니다. <q>화면에 노란 결제 버튼이 떴어요. 눌러 주세요.</q><span class="who">서버 → 폰</span></span></li>
+      <li><span class="k">결제</span><span class="v">원터치 결제 시트에서 결제하기, 비밀번호 6자리. 돈은 움직이지 않습니다. 90초 동안 누르지 않으면 예약을 풀어 줍니다.<span class="who">어르신 → 서버</span></span></li>
+      <li><span class="k">완료</span><span class="v"><q>결제됐어요. 문자로 보내드렸어요.</q> 결제가 끝난 뒤에만 이 말을 합니다.<span class="who">AI</span></span></li>
+      <li><span class="k">문자</span><span class="v">2초 뒤 문자 알림음과 진동, 헤드업 알림을 누르면 삼성 메시지 화면에 <code>[여기로] 예약 확인</code>.<span class="who">서버 → 폰</span></span></li>
+      <li><span class="k">종료</span><span class="v"><q>조심히 다녀오세요.</q>가 다 재생된 뒤 끊고, 종료음과 함께 통화 종료 화면이 나옵니다.<span class="who">AI → 폰</span></span></li>
+      <li><span class="k">정리</span><span class="v">통화 기록을 확정하고 테스트 예약을 바로 취소합니다. 콘솔에 자막·도구·게이트 판정이 남습니다.<span class="who">서버 → 코레일 · 콘솔</span></span></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>소리 설계</h2>
+    <p class="intro">화면을 보지 않고 귀로만 쓰는 서비스라서, 통화의 질감과 기다림의 처리가 곧 UX입니다.</p>
+    <div class="sound">
+      <div><h3>발신과 연결</h3><p>키마다 DTMF 두 음과 짧은 진동. 한국 링백(440+480Hz)을 최소 한 번 끝까지 들려주고, 그 사이에 연결 지연을 숨깁니다. 연결되면 0.6초 안에 첫마디.</p></div>
+      <div><h3>말 차례</h3><p>semantic_vad를 low로 둬서 천천히 말하거나 중간에 쉬어도 끊지 않습니다. 어르신이 말을 시작하면 AI는 바로 멈춥니다.</p></div>
+      <div><h3>스피커폰</h3><p>스피커를 켠 채로 시작합니다. 에코 제거와 잡음 억제를 켜고, 입력은 먼 거리 기준으로 처리해 AI가 자기 목소리에 끊기지 않게 합니다.</p></div>
+      <div><h3>기다림</h3><p>도구를 부르기 전에 "잠시만요, 찾아볼게요." 한 번. 4초를 넘기면 8초마다 "자리 잡는 중이에요." 침묵이 3초를 넘지 않게 합니다.</p></div>
+      <div><h3>숫자와 속도</h3><p>시각은 "두 시 육 분", 금액은 "만 삼천이십 원". 문장은 코드가 만들고 AI는 그대로 읽습니다. 출력 속도 0.9, 작은 소리는 컴프레서로 끌어올립니다.</p></div>
+      <div><h3>침묵과 끝</h3><p>7초 침묵이면 "천천히 말씀하셔도 돼요." 다시 10초면 정중히 끊습니다. 끝인사가 다 나간 뒤에만 끊고 종료음을 냅니다.</p></div>
+      <div><h3>결제와 문자</h3><p>결제 시트가 뜰 때 알림음, 결제가 끝나면 완료음, 2초 뒤 문자 알림음과 진동. 세 소리가 겹치지 않게 순서를 둡니다.</p></div>
+      <div><h3>전화 음질 모드</h3><p>콘솔에서 켜면 마이크를 300~3400Hz, 8kHz로 깎아 실제 통화 조건에서 인식률을 봅니다. 실험 때 켜고 발표 때 끕니다.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>코레일 모드</h2>
+    <p class="intro">대화는 모드를 모릅니다. 콘솔 토글 하나로 바꾸고, 노트북 작업자가 4초 안에 응답하지 않으면 서버가 알아서 내려갑니다.</p>
+    <div class="modes">
+      <div class="mode"><span class="tag">AUTO</span><h3>실제 조회와 예약</h3><p>조중휘 계정으로 잔여석 조회와 미결제 예약. 통화가 끝나면 바로 취소합니다.</p></div>
+      <div class="mode"><span class="tag">ASSIST</span><h3>사람이 대신 예약</h3><p>공공데이터로 제안하고, 운영자가 콘솔 요청을 보고 코레일+ 앱으로 예약해 예약번호를 넣습니다.</p></div>
+      <div class="mode"><span class="tag">MOCK</span><h3>리허설과 백업</h3><p>공공데이터 시간표와 운임에 가짜 예약번호. 발표 중 장애 대비용입니다.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>진짜와 가짜</h2>
+    <div class="split">
+      <div class="panel real">
+        <h3>진짜로 작동</h3>
+        <ul>
+          <li>OpenAI 음성 대화 <span>끼어들기, 말 바꾸기, 사투리</span></li>
+          <li>코레일 실시간 조회와 실제 좌석 예약 <span>AUTO일 때</span></li>
+          <li>동의 게이트와 결제 요청 흐름</li>
+          <li>통화 기록과 운영 콘솔 <span>측정 지표 3개</span></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>가짜 · 시연 때 밝힘</h3>
+        <ul>
+          <li>전화망 <span>삼성 전화 화면을 재현한 웹앱, 음성은 WebRTC</span></li>
+          <li>결제 <span>원터치 화면과 승인만, 브랜드명은 가짜</span></li>
+          <li>문자 <span>삼성 메시지 화면 재현, 통신망 문자 아님</span></li>
+          <li>이용자 계정 <span>모든 예약은 조중휘 계정, 통화 후 취소</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>기준일 2026년 11월 13일. 세부 설계는 <a href="plan.md">기획안</a>에 있습니다.</footer>
+</div>
+</body>
+</html>

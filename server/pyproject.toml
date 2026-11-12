@@ -1,0 +1,50 @@
+[project]
+name = "yeogiro-server"
+version = "0.1.0"
+description = "여기로 call server and rail worker"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "httpx>=0.27",
+  "websockets>=13",
+  "google-cloud-firestore>=2.19",
+  "python-dotenv>=1.0",
+  "tzdata>=2024.1",
+]
+
+[project.optional-dependencies]
+korail = ["korail2>=0.4"]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.6", "mypy>=1.11"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/yeogiro"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["E501", "RUF001", "RUF002", "RUF003"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+mypy_path = "src"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+
+[[tool.mypy.overrides]]
+module = ["korail2", "korail2.*"]
+ignore_missing_imports = true

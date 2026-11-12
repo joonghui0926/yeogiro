@@ -1,0 +1,45 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'kaist_101@yeogiro.local';
+    }
+
+    match /calls/{callId} {
+      allow read: if isAdmin();
+      match /events/{eventId} {
+        allow read: if isAdmin();
+      }
+    }
+
+    match /testers/{testerId} {
+      allow read: if isAdmin();
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if isAdmin();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAdmin();
+    }
+
+    match /inbox/{testerId}/messages/{messageId} {
+      allow read: if isAdmin();
+    }
+
+    match /railJobs/{jobId} {
+      allow read: if isAdmin();
+      allow update: if isAdmin()
+        && resource.data.handler == 'operator'
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'result', 'error', 'doneAt', 'operator']);
+    }
+
+    match /config/runtime {
+      allow read, write: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,76 @@
+[
+  {
+    "id": 1,
+    "name": "재이용, 사투리로 바로 동의",
+    "why": "인터뷰 예시 그대로. 되묻기 0회가 목표",
+    "tester": { "home": "대전", "senior": true },
+    "turns": ["담주 화욜 오후에 서울 좀 가려고", "그려, 그걸로 혀", "없어요, 고마워요"],
+    "expect": { "outcome": "booked", "max_reasks": 0 }
+  },
+  {
+    "id": 2,
+    "name": "첫 이용, 출발역과 경로 확인",
+    "why": "출발역과 경로 여부를 모르는 첫 통화. 되묻기 3회 이하",
+    "tester": { "home": null, "senior": null },
+    "turns": ["수원 가야 되는데, 내일 네 시쯤", "대전역이요", "일흔 셋이여", "네네, 해 주세요", "됐어요"],
+    "expect": { "outcome": "booked", "max_reasks": 3 }
+  },
+  {
+    "id": 3,
+    "name": "매진, 말 바꾸기, 되물음",
+    "why": "원하는 시간이 매진. 오전으로 바꾸고, '응?'은 동의로 치지 않아야 함",
+    "tester": { "home": "대전", "senior": false },
+    "sold_out": true,
+    "turns": ["내일 오후 네 시쯤 서울", "아니 아니, 오전으로", "응?", "그래, 그걸로 해 줘", "없어"],
+    "expect": { "outcome": "booked", "max_reasks": 1 }
+  },
+  {
+    "id": 4,
+    "name": "제안에 질문",
+    "why": "요금과 도착 시각을 묻고 나서 동의",
+    "tester": { "home": "대전", "senior": false },
+    "turns": ["모레 아침에 부산 가요", "얼마라고요?", "몇 시에 도착해요?", "좋아요, 잡아 줘요", "아니요, 없어요"],
+    "expect": { "outcome": "booked", "max_reasks": 0 }
+  },
+  {
+    "id": 5,
+    "name": "앞 차로 바꾸기",
+    "why": "제안이 늦다고 바로 앞 기차를 원함",
+    "tester": { "home": "대전", "senior": true },
+    "turns": ["다음 주 월요일 저녁에 서울", "아이고 너무 늦어. 그 앞에 차는 없어?", "그거 좋네, 해 줘", "고마워요, 끊을게요"],
+    "expect": { "outcome": "booked", "max_reasks": 0 }
+  },
+  {
+    "id": 6,
+    "name": "잘 안 들림",
+    "why": "청력 문제. 속도를 늦추고 짧게 다시 말해야 함",
+    "tester": { "home": "대전", "senior": true },
+    "turns": ["내일 동대구 가는 거, 아침에", "뭐라고? 잘 안 들려", "어어, 그려 그거", "없어"],
+    "expect": { "outcome": "booked", "max_reasks": 0 }
+  },
+  {
+    "id": 7,
+    "name": "망설이다 안 함",
+    "why": "망설임과 침묵, 거절. 예약이 생기면 안 됨",
+    "tester": { "home": "대전", "senior": false },
+    "turns": ["토요일 오후에 광주송정", "음... 글쎄...", { "wait": 9 }, "다음에 할게요", "아니 됐어요"],
+    "expect": { "not_outcome": "booked" }
+  },
+  {
+    "id": 8,
+    "name": "딴 얘기로 시작",
+    "why": "목적지를 이야기 속에서 알아듣고 바로 찾아야 함",
+    "tester": { "home": "대전", "senior": false },
+    "turns": ["우리 아들이 서울 사는데, 손주 보러 가려고", "다음 주 수요일 아침", "좋아, 그걸로", "없어요"],
+    "expect": { "outcome": "booked", "max_reasks": 1 }
+  },
+  {
+    "id": 9,
+    "name": "결제 버튼을 안 누름",
+    "why": "동의는 했지만 화면을 못 봄. 안내 두 번 뒤 자리를 풀어야 함",
+    "tester": { "home": "대전", "senior": false },
+    "pay": false,
+    "turns": ["내일 점심 먹고 서울", "네, 해 주세요", { "wait": 70 }],
+    "expect": { "outcome": "payment_timeout" }
+  }
+]

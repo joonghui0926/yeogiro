@@ -1,0 +1,24 @@
+{
+  "hosting": {
+    "public": "dist/hosting",
+    "ignore": ["firebase.json", "**/.*"],
+    "rewrites": [
+      { "source": "/console/**", "destination": "/console/index.html" },
+      { "source": "**", "destination": "/index.html" }
+    ],
+    "headers": [
+      {
+        "source": "**/sw.js",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "source": "**/*.webmanifest",
+        "headers": [{ "key": "Content-Type", "value": "application/manifest+json" }]
+      }
+    ]
+  },
+  "firestore": {
+    "rules": "infra/firebase/firestore.rules",
+    "indexes": "infra/firebase/firestore.indexes.json"
+  }
+}

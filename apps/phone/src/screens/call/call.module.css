@@ -1,0 +1,165 @@
+.call {
+  background: var(--ui-call-bg);
+  z-index: 20;
+  animation: rise 220ms ease-out;
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+
+.head {
+  padding: 9vh 24px 0;
+  text-align: center;
+}
+
+.name {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: var(--ui-ink);
+}
+
+.number {
+  margin: 10px 0 0;
+  font-size: 16px;
+  color: var(--ui-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.status,
+.statusEnded {
+  margin: 8px 0 0;
+  font-size: 15px;
+  color: var(--ui-muted);
+  font-variant-numeric: tabular-nums;
+  min-height: 22px;
+}
+
+.statusEnded {
+  color: var(--ui-end);
+}
+
+.middle {
+  flex: 1;
+  display: grid;
+  place-items: center;
+}
+
+.avatar {
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  display: grid;
+  place-items: end center;
+  overflow: hidden;
+  background: #d8e0ee;
+  color: #f7f9fc;
+}
+
+@media (prefers-color-scheme: dark) {
+  .avatar {
+    background: #2b3240;
+    color: #4a5466;
+  }
+}
+
+.inCallKeypad {
+  display: grid;
+  grid-template-columns: repeat(3, 76px);
+  gap: 6px 26px;
+}
+
+.tapped {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 26px;
+  min-height: 34px;
+  margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.inCallKey {
+  height: 62px;
+  font-size: 30px;
+  border-radius: 31px;
+}
+
+.inCallKey:active {
+  background: var(--ui-faint);
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  row-gap: 18px;
+  padding: 0 30px;
+  margin-bottom: 34px;
+}
+
+.controls[aria-disabled='true'] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.controlIcon,
+.controlIconActive {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--ui-ink);
+}
+
+.controlIcon svg,
+.controlIconActive svg {
+  width: 27px;
+  height: 27px;
+}
+
+.controlIconActive {
+  background: var(--ui-blue);
+  color: #fff;
+}
+
+.controlLabel {
+  font-size: 13px;
+  color: var(--ui-ink-2);
+}
+
+.endRow {
+  display: grid;
+  place-items: center;
+  padding-bottom: 6vh;
+}
+
+.endButton {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--ui-end);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 14px rgba(242, 72, 61, 0.3);
+}
+
+.endButton:disabled {
+  opacity: 0.6;
+}
+
+.endIcon {
+  transform: rotate(135deg);
+}

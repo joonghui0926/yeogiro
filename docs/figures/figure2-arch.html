@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Figure 2 — 아키텍처</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root { --ink:#1a1a1a; --mut:#6b6b6b; --line:#555; --soft:#efefec; --accent:#1e6b4f; --accent-bg:#e6f0eb; --amber:#9a5418; }
+  * { margin:0; box-sizing:border-box; }
+  body { background:#fff; font-family:"IBM Plex Sans KR",sans-serif; color:var(--ink); }
+  .fig { width:1060px; padding:40px 40px 36px; }
+  .cap { margin-top:18px; font-size:14.5px; color:var(--mut); line-height:1.65; max-width:96ch; }
+  .cap b { color:var(--ink); font-weight:600; }
+  .box { fill:#fff; stroke:var(--line); stroke-width:1.4; }
+  .box-a { fill:var(--accent-bg); stroke:var(--accent); stroke-width:1.8; }
+  .grp { fill:#faf9f6; stroke:#c8c8c0; stroke-width:1.3; }
+  .sub { fill:#fff; stroke:#9a9a92; stroke-width:1.2; }
+  .trust { fill:none; stroke:var(--amber); stroke-width:1.5; stroke-dasharray:6 5; }
+  .ln { fill:none; stroke:var(--line); stroke-width:1.5; }
+  .ln-a { fill:none; stroke:var(--accent); stroke-width:2; }
+  .dash { stroke-dasharray:4 4; stroke:#8a8a84; }
+  .t { font-size:14.5px; font-weight:600; fill:var(--ink); }
+  .ts { font-size:13.5px; font-weight:600; fill:var(--ink); }
+  .s { font-size:11.5px; fill:var(--mut); }
+  .m { font-family:"IBM Plex Mono",monospace; font-size:11px; fill:var(--mut); }
+  .lb { font-size:11.5px; fill:var(--mut); }
+  .lb-a { font-size:11.5px; font-weight:600; fill:var(--accent); }
+  .lb-am { font-size:11.5px; font-weight:600; fill:var(--amber); }
+  .zone { font-size:11px; font-weight:600; letter-spacing:.08em; fill:#9a9a92; }
+</style>
+</head>
+<body>
+<div class="fig">
+<svg width="1000" height="600" viewBox="0 0 1000 600" font-family="IBM Plex Sans KR">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#555"/></marker>
+    <marker id="aa" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#1e6b4f"/></marker>
+    <marker id="as" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#555"/></marker>
+  </defs>
+
+  <!-- zone labels -->
+  <text class="zone" x="30" y="52">클라이언트</text>
+  <text class="zone" x="258" y="212">엣지</text>
+  <text class="zone" x="452" y="52">여기로 서버 · CLOUD RUN</text>
+  <text class="zone" x="812" y="52">외부 · 데이터</text>
+
+  <!-- voice: phone straight to OpenAI -->
+  <path class="ln-a" d="M122 80V30H891V72" marker-end="url(#aa)"/>
+  <text class="lb-a" x="505" y="22" text-anchor="middle">음성 · WebRTC — 폰이 OpenAI에 직접 연결</text>
+  <!-- static files from Hosting -->
+  <path class="ln dash" d="M313 222V128H216" marker-end="url(#a)"/>
+  <path class="ln dash" d="M313 308V378H216" marker-end="url(#a)"/>
+  <text class="lb" x="322" y="174">정적 파일</text>
+  <text class="lb" x="322" y="350">정적 파일</text>
+  <!-- phone to server -->
+  <path class="ln" d="M214 100H452" marker-start="url(#as)" marker-end="url(#a)"/>
+  <text class="lb" x="335" y="93" text-anchor="middle">/api · SSE</text>
+  <!-- server to OpenAI (sideband) -->
+  <path class="ln-a" d="M712 98H812" marker-start="url(#aa)" marker-end="url(#aa)"/>
+  <text class="lb-a" x="762" y="90" text-anchor="middle">사이드밴드 WS</text>
+  <!-- server to TAGO -->
+  <path class="ln" d="M712 160H762V214H812" marker-end="url(#a)"/>
+  <text class="lb" x="748" y="206" text-anchor="middle">조회</text>
+  <!-- server to Firestore -->
+  <path class="ln" d="M712 330H812" marker-end="url(#a)"/>
+  <text class="lb" x="762" y="323" text-anchor="middle">Admin SDK</text>
+  <!-- console to Firestore -->
+  <path class="ln" d="M214 404H782V372H812" marker-end="url(#a)"/>
+  <text class="lb" x="500" y="397" text-anchor="middle">client SDK · 읽기 전용(보안 규칙)</text>
+  <!-- railJobs: firestore to worker -->
+  <path class="ln-a" d="M891 394V432H620V478" marker-end="url(#aa)"/>
+  <text class="lb-a" x="902" y="418">railJobs</text>
+  <!-- worker to korail -->
+  <path class="ln" d="M700 512H812" marker-start="url(#as)" marker-end="url(#a)"/>
+
+  <!-- tester PWA -->
+  <rect class="box" x="30" y="80" width="184" height="66" rx="9"/>
+  <text class="ts" x="122" y="106" text-anchor="middle">테스터 PWA</text>
+  <text class="s" x="122" y="126" text-anchor="middle">삼성 전화·결제·메시지 화면</text>
+
+  <!-- console PWA -->
+  <rect class="box" x="30" y="358" width="184" height="66" rx="9"/>
+  <text class="ts" x="122" y="384" text-anchor="middle">운영 콘솔 PWA</text>
+  <text class="s" x="122" y="404" text-anchor="middle">기록·지표·실시간·대리 예약</text>
+
+  <!-- edge -->
+  <rect class="box" x="256" y="222" width="114" height="86" rx="9"/>
+  <text class="ts" x="313" y="252" text-anchor="middle">Firebase</text>
+  <text class="ts" x="313" y="270" text-anchor="middle">Hosting</text>
+  <text class="m" x="313" y="292" text-anchor="middle">/ · /console</text>
+
+  <!-- server group -->
+  <rect class="grp" x="452" y="62" width="260" height="304" rx="11"/>
+  <text class="t" x="468" y="84">FastAPI</text>
+  <text class="m" x="698" y="84" text-anchor="end">domain ← calls ← adapters</text>
+  <rect class="sub" x="468" y="96" width="228" height="52" rx="7"/>
+  <text class="ts" x="582" y="117" text-anchor="middle">api — 통화 생성 · SSE</text>
+  <text class="s" x="582" y="135" text-anchor="middle">SDP 중계 · 결제 승인 · 문자함</text>
+  <rect class="sub" x="468" y="158" width="228" height="66" rx="7"/>
+  <text class="ts" x="582" y="180" text-anchor="middle">calls — CallSession 상태기계</text>
+  <text class="s" x="582" y="198" text-anchor="middle">도구 실행 · 침묵·대기 타이머</text>
+  <text class="s" x="582" y="214" text-anchor="middle">동의 게이트(확인 모델 + 8조건)</text>
+  <rect class="sub" x="468" y="234" width="228" height="44" rx="7"/>
+  <text class="ts" x="582" y="255" text-anchor="middle">domain — 순수 계층</text>
+  <text class="s" x="582" y="271" text-anchor="middle">날짜·열차 선택·운임·발화문</text>
+  <rect class="sub" x="468" y="288" width="228" height="66" rx="7"/>
+  <text class="ts" x="582" y="310" text-anchor="middle">adapters (ports)</text>
+  <text class="m" x="582" y="328" text-anchor="middle">openai · rail · payment</text>
+  <text class="m" x="582" y="343" text-anchor="middle">messaging · store</text>
+
+  <!-- OpenAI -->
+  <rect class="box-a" x="812" y="74" width="158" height="60" rx="9"/>
+  <text class="ts" x="891" y="98" text-anchor="middle">OpenAI Realtime</text>
+  <text class="m" x="891" y="117" text-anchor="middle">gpt-realtime-2.1</text>
+
+  <!-- TAGO -->
+  <rect class="box" x="812" y="188" width="158" height="54" rx="9"/>
+  <text class="ts" x="891" y="210" text-anchor="middle">공공데이터 TAGO</text>
+  <text class="s" x="891" y="228" text-anchor="middle">실시간 시간표 · 운임</text>
+
+  <!-- Firestore cylinder -->
+  <path class="box" d="M812 300a79 13 0 0 1 158 0v80a79 13 0 0 1 -158 0z"/>
+  <path class="box" d="M812 300a79 13 0 0 0 158 0" fill="none"/>
+  <text class="ts" x="891" y="332" text-anchor="middle">Firestore</text>
+  <text class="s" x="891" y="352" text-anchor="middle">calls·events·payments</text>
+  <text class="s" x="891" y="368" text-anchor="middle">inbox·railJobs·config</text>
+
+  <!-- trust boundary -->
+  <rect class="trust" x="512" y="452" width="470" height="104" rx="12"/>
+  <text class="lb-am" x="970" y="470" text-anchor="end">코레일 계정은 이 경계를 벗어나지 않음</text>
+
+  <!-- worker -->
+  <rect class="box" x="540" y="480" width="160" height="64" rx="9"/>
+  <text class="ts" x="620" y="504" text-anchor="middle">코레일 작업자</text>
+  <text class="s" x="620" y="523" text-anchor="middle">조중휘 노트북 · 1건씩</text>
+
+  <!-- korail -->
+  <rect class="box" x="812" y="484" width="156" height="56" rx="9"/>
+  <text class="ts" x="890" y="508" text-anchor="middle">코레일</text>
+  <text class="s" x="890" y="526" text-anchor="middle">AUTO·ASSIST·MOCK</text>
+</svg>
+<div class="cap"><b>Figure 2. 시스템 아키텍처.</b> 두 PWA(테스터·운영 콘솔)는 Firebase Hosting으로 서빙되고, <span style="color:#1e6b4f">초록 경로</span>가 음성을 나른다: 테스터 폰은 WebRTC로 OpenAI에 직접 연결되고, 여기로 서버(Cloud Run · FastAPI)가 사이드밴드 WebSocket으로 붙어 도구를 실행한다. Hosting은 정적 파일만 내려주고, 폰의 API·SSE 요청은 Cloud Run에 직접 간다. 서버는 <span style="font-family:'IBM Plex Mono'">domain ← calls ← adapters</span> 의존 방향을 지키며, 순수 도메인 계층이 날짜·열차 선택·운임을 계산하고 외부 시스템은 모두 포트 뒤에 있다. 열차 시간표는 공공데이터 TAGO에서 실시간으로 조회한다. 모든 통화 기록은 서버가 Admin SDK로 Firestore에 쓰고, 콘솔은 보안 규칙으로 보호된 읽기 전용 접근만 한다. 실제 코레일 예약은 작업 큐(<span style="font-family:'IBM Plex Mono'">railJobs</span>)를 통해 조중휘 노트북의 작업자가 처리하여, <span style="color:#9a5418">계정 자격 증명이 신뢰 경계 밖으로 나가지 않는다.</span></div>
+</div>
+</body>
+</html>
