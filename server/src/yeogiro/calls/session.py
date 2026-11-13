@@ -188,6 +188,11 @@ class CallSession:
         }
 
     @property
+    def last_response_at(self) -> float:
+        """Monotonic time the assistant last finished a response."""
+        return self._last_response_done
+
+    @property
     def payment_id(self) -> str | None:
         return self._payment_id
 

@@ -81,17 +81,19 @@ async def play(card: dict[str, Any], settings: Settings, http: httpx.AsyncClient
     started = time.monotonic()
 
     await session.on_media_connected()
+    spoke_at = 0.0
     for step in card["turns"]:
-        await _until_quiet(session, card)
+        await _until_quiet(session, card, spoke_at)
         if session.closed:
             break
         if isinstance(step, str):
             await voice.line.speak(step)
+            spoke_at = time.monotonic()
         else:
             await asyncio.sleep(float(step.get("wait", 0)))
         await asyncio.sleep(0.3)
 
-    await _until_quiet(session, card)
+    await _until_quiet(session, card, spoke_at)
     if not session.closed:
         await asyncio.sleep(3)
         await session.hangup("simulator")
@@ -119,12 +121,14 @@ async def _phone(session: CallSession, card: dict[str, Any]) -> None:
             await session.approve_payment(event["payment"]["id"])
 
 
-async def _until_quiet(session: CallSession, card: dict[str, Any]) -> None:
+async def _until_quiet(session: CallSession, card: dict[str, Any], spoke_at: float) -> None:
+    """Wait until the assistant has answered the last line and gone quiet, like a person would."""
     deadline = time.monotonic() + TURN_TIMEOUT_SECONDS
     quiet_since: float | None = None
     while time.monotonic() < deadline and not session.closed:
         tapping = card.get("pay", True) and session.state is CallState.PAYMENT_PENDING
-        if session.quiet and not tapping:
+        answered = session.last_response_at >= spoke_at
+        if session.quiet and answered and not tapping:
             quiet_since = quiet_since or time.monotonic()
             if time.monotonic() - quiet_since >= QUIET_HOLD_SECONDS:
                 return
