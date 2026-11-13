@@ -419,7 +419,9 @@ class CallSession:
         if day is None:
             return {"need": "date", "say": lines.ASK_DATE}
         part = _enum(PartOfDay, args.get("part_of_day"), PartOfDay.ANY)
-        window = resolve_window(day, part, args.get("clock_time"), now)
+        window = resolve_window(
+            day, part, args.get("clock_time"), now, args.get("arrival_clock_time")
+        )
         party = min(max(_int(args.get("party")) or 1, 1), 4)
 
         self._invalidate_proposal()
@@ -472,14 +474,20 @@ class CallSession:
         if transfers and (not suitable or args.get("prefer_transfer") is True):
             # Routes arrive shortest first, and an earlier or later request nearest first; only a
             # named time of day re-ranks them around that time.
-            timed = part is not PartOfDay.ANY or bool(args.get("clock_time"))
+            timed = (
+                part is not PartOfDay.ANY
+                or bool(args.get("clock_time"))
+                or bool(args.get("arrival_clock_time"))
+            )
             picked = (
                 choose_route(transfers, window, now + BOOKING_LEAD)
                 if timed and route_direction not in ("earlier", "later")
                 else transfers[0]
             )
             if picked is not None:
-                choice = Choice(picked.legs[0], None, picked)
+                choice = Choice(
+                    picked.legs[0], None, picked, by_arrival=window.anchor == "arrives"
+                )
                 self._rail_source = "tago"
         if choice is None:
             self._enter(CallState.LISTENING)
@@ -542,7 +550,10 @@ class CallSession:
             self._enter(CallState.PROPOSED)
             side = "앞" if direction == "earlier" else "뒤"
             return {"need": "keep_current", "say": lines.NO_ADJACENT.format(side=side)}
-        return self._propose(Choice(train=nearby, sold_out_preferred=None), current.party)
+        return self._propose(
+            Choice(train=nearby, sold_out_preferred=None, by_arrival=current.by_arrival),
+            current.party,
+        )
 
     async def _set_senior(self, args: dict[str, Any]) -> dict[str, Any]:
         self._senior = bool(args.get("is_senior"))
@@ -552,8 +563,9 @@ class CallSession:
             self._pending_choice = None
             return self._propose(choice, party)
         if self._current is not None:
+            current = self._current
             return self._propose(
-                Choice(self._current.train, None, self._current.itinerary), self._current.party
+                Choice(current.train, None, current.itinerary, current.by_arrival), current.party
             )
         return {"say": lines.SENIOR_NOTED}
 
@@ -579,6 +591,7 @@ class CallSession:
             sold_out_preferred=choice.sold_out_preferred,
             created_at=now,
             itinerary=route,
+            by_arrival=choice.by_arrival,
         )
         self._options[proposal.option_id] = proposal
         self._current = proposal
@@ -589,7 +602,7 @@ class CallSession:
             and not self._search_details.get("api_failed")
         ):
             self._proposal_say = "바로 가는 기차가 없어요. " + self._proposal_say
-        self._proposal_short = speech.reconfirm_route(route)
+        self._proposal_short = speech.reconfirm_route(route, proposal.by_arrival)
         self._expect_proposal = True
         self._consent_misses = 0
         self._enter(CallState.PROPOSED)

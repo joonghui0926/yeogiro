@@ -100,8 +100,13 @@ def proposal_sentence(proposal: Proposal, today: date, senior_discounted: bool) 
     train = proposal.train
     parts: list[str] = []
     if proposal.sold_out_preferred is not None:
-        missed = read_clock(proposal.sold_out_preferred.departs_at.time())
-        parts.append(f"{missed} 기차는 자리가 다 찼어요.")
+        missed_train = proposal.sold_out_preferred
+        if proposal.by_arrival:
+            missed = read_clock(missed_train.arrives_at.time())
+            parts.append(f"{missed} 도착 기차는 자리가 다 찼어요.")
+        else:
+            missed = read_clock(missed_train.departs_at.time())
+            parts.append(f"{missed} 기차는 자리가 다 찼어요.")
 
     route_text = f"{read_day(train.departs_at.date(), today)} {train.dep}에서 {train.arr},"
     times = (
@@ -205,9 +210,9 @@ def proposal_facts(proposal: Proposal, today: date, senior_discounted: bool) -> 
     }
 
 
-def reconfirm_route(route: Itinerary) -> str:
+def reconfirm_route(route: Itinerary, by_arrival: bool = False) -> str:
     if len(route.legs) == 1:
-        return reconfirm_sentence(route.legs[0])
+        return reconfirm_sentence(route.legs[0], by_arrival)
     last = route.legs[-1]
     return (
         f"{route.legs[0].arr}에서 한 번 갈아타서 {read_clock(last.arrives_at.time())}에 "
@@ -215,8 +220,12 @@ def reconfirm_route(route: Itinerary) -> str:
     )
 
 
-def reconfirm_sentence(train: Train) -> str:
-    return f"{read_clock(train.departs_at.time())}에 {train.arr} 가는 기차예요. 예약할까요?"
+def reconfirm_sentence(train: Train, by_arrival: bool = False) -> str:
+    departs = read_clock(train.departs_at.time())
+    if by_arrival:
+        arrives = read_clock(train.arrives_at.time())
+        return f"{departs}에 출발해서 {arrives}에 {train.arr} 도착하는 기차예요. 예약할까요?"
+    return f"{departs}에 {train.arr} 가는 기차예요. 예약할까요?"
 
 
 def ticket_message(hold: Hold, party: int) -> str:

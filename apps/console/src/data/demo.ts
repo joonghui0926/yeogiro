@@ -123,7 +123,7 @@ function baseEvents(): WithId<CallEvent>[] {
     ],
   }
   return [
-    ev('e1', 1200, { kind: 'ai', text: '여기로 기차 예약 AI예요. 어디로, 언제 가세요?' }),
+    ev('e1', 1200, { kind: 'ai', text: '여기로 기차 예약 AI예요. 어디로, 언제 출발하세요?' }),
     ev('e2', 9800, { kind: 'user', text: '담주 화요일 오후에 서울 좀 가려고' }),
     ev('e3', 10500, { kind: 'ai', text: '잠시만요, 찾아볼게요.' }),
     ev('e4', 10700, { kind: 'tool_call', name: 'find_trains', args: { arrival: '서울', relative_day: 'next_week', weekday: 'tue', part_of_day: 'afternoon' } }),

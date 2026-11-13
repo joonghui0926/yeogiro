@@ -151,16 +151,17 @@ def _speech_checks(events: list[dict[str, Any]], expect: dict[str, Any]) -> list
         checks.append(start is not None and not any(p in t for t in later for p in rule["never_say"]))
     if "last_ai" in expect:
         checks.append(bool(said) and expect["last_ai"] in said[-1]["text"])
-    if "depart_between" in expect:
-        low, high = expect["depart_between"]
-        offers = [
-            e["result"]["train"]["departsAt"][11:16]
-            for e in events
-            if e["kind"] == "tool_result"
-            and e.get("name") == "find_trains"
-            and (e.get("result") or {}).get("train")
-        ]
-        checks.append(bool(offers) and low <= offers[-1] <= high)
+    offered = [
+        e["result"]["train"]
+        for e in events
+        if e["kind"] == "tool_result"
+        and e.get("name") == "find_trains"
+        and (e.get("result") or {}).get("train")
+    ]
+    for key, field in (("depart_between", "departsAt"), ("arrive_between", "arrivesAt")):
+        if key in expect:
+            low, high = expect[key]
+            checks.append(bool(offered) and low <= offered[-1][field][11:16] <= high)
     return checks
 
 

@@ -173,5 +173,21 @@
     "tester": { "home": "대전", "senior": false },
     "turns": ["서울역으로 오후 여섯 시에 가고 싶어", "오후 두 시쯤 출발하면 좋을 것 같아", "모레로 해 줘", "그렇게 해 줘"],
     "expect": { "outcome": "booked", "depart_between": ["13:00", "15:30"] }
+  },
+  {
+    "id": 22,
+    "name": "도착 시각만 말함",
+    "why": "네 시까지 가야 한다고 하면 출발 시각을 되묻지 않고 네 시 전에 도착하는 기차를 고름",
+    "tester": { "home": "대전", "senior": false },
+    "turns": ["내일 오후 네 시까지 서울역에 가야 돼", "그걸로 해 줘"],
+    "expect": { "outcome": "booked", "arrive_between": ["14:30", "16:00"], "max_reasks": 0 }
+  },
+  {
+    "id": 23,
+    "name": "출발과 도착 둘 다 말함",
+    "why": "둘 다 들으면 도착 시각을 우선해 열한 시 전에 도착하는 기차를 고름",
+    "tester": { "home": "대전", "senior": false },
+    "turns": ["모레 아침 아홉 시쯤 출발해서 열한 시 전에 부산에 도착하고 싶어", "응, 그걸로"],
+    "expect": { "outcome": "booked", "arrive_between": ["09:30", "11:00"] }
   }
 ]

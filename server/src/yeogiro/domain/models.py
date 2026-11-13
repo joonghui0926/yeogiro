@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from typing import Literal
+
+# Which end of the trip a time the caller named refers to.
+TimeAnchor = Literal["departs", "arrives"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +34,9 @@ class TravelWindow:
     start: time
     end: time
     center: time
+    # The exact clock time the caller named, if any, and whether it is a departure or an arrival.
+    asked: time | None = None
+    anchor: TimeAnchor = "departs"
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +44,7 @@ class Choice:
     train: Train
     sold_out_preferred: Train | None
     itinerary: Itinerary | None = None
+    by_arrival: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +57,7 @@ class Proposal:
     sold_out_preferred: Train | None
     created_at: datetime
     itinerary: Itinerary | None = None
+    by_arrival: bool = False
 
 
 @dataclass(frozen=True, slots=True)

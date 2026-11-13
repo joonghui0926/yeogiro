@@ -45,7 +45,17 @@ FIND_TRAINS: dict[str, Any] = {
             },
             "clock_time": {
                 "type": "string",
-                "description": "시각을 말했을 때만 HH:MM. '네 시쯤'이면 04:00, 오전·오후는 part_of_day로",
+                "description": (
+                    "출발 시각을 말했을 때만 HH:MM. '네 시쯤'이면 04:00, 오전·오후는 part_of_day로"
+                ),
+            },
+            "arrival_clock_time": {
+                "type": "string",
+                "description": (
+                    "선택. 어르신이 도착 시각을 스스로 말했을 때만 HH:MM, 먼저 묻지 않는다. "
+                    "'네 시까지 도착', '네 시엔 거기 있어야 돼'면 04:00, 오전·오후는 part_of_day로. "
+                    "넣으면 출발 시각보다 이 시각을 우선해서 고른다"
+                ),
             },
             "party": {"type": "integer", "minimum": 1, "maximum": 4, "description": "인원, 기본 1"},
             "shift": {
