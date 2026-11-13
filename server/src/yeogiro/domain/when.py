@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta
 from enum import StrEnum
 
-from yeogiro.domain.models import TravelWindow
+from yeogiro.domain.models import TimeAnchor, TravelWindow
 
 
 class RelativeDay(StrEnum):
@@ -39,6 +39,9 @@ _PARTS: dict[PartOfDay, tuple[time, time, time]] = {
 }
 
 BOOKING_LEAD = timedelta(minutes=20)
+
+# How far before a requested arrival to start looking. Covers the slowest direct trains.
+ARRIVAL_LOOKBACK_MINUTES = 6 * 60
 
 
 def resolve_day(
@@ -90,13 +93,29 @@ def resolve_window(
     part: PartOfDay,
     clock: str | None,
     now: datetime,
+    arrival_clock: str | None = None,
 ) -> TravelWindow:
+    """Turn what the caller said into a search window.
+
+    A departure time (clock) or an arrival time (arrival_clock) is enough on its own. When both
+    are given, the arrival time wins because it is usually the one the caller cannot miss.
+    """
     start, end, center = _PARTS[part]
-    asked = _parse_clock(clock, part)
-    if asked is not None:
-        center = asked
-        start = _shift(asked, -45)
-        end = _shift(asked, 75)
+    asked: time | None = None
+    anchor: TimeAnchor = "departs"
+
+    arrives = _parse_clock(arrival_clock, part)
+    departs = _parse_clock(clock, part)
+    if arrives is not None:
+        asked, anchor = arrives, "arrives"
+        start = _shift(arrives, -ARRIVAL_LOOKBACK_MINUTES)
+        end = arrives
+        center = arrives
+    elif departs is not None:
+        asked = departs
+        center = departs
+        start = _shift(departs, -45)
+        end = _shift(departs, 75)
 
     if day == now.date():
         earliest = (now + BOOKING_LEAD).time().replace(second=0, microsecond=0)
@@ -107,7 +126,7 @@ def resolve_window(
         if center < start:
             center = start
 
-    return TravelWindow(day=day, start=start, end=end, center=center)
+    return TravelWindow(day=day, start=start, end=end, center=center, asked=asked, anchor=anchor)
 
 
 def _parse_clock(value: str | None, part: PartOfDay) -> time | None:

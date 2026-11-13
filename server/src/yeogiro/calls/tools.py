@@ -45,7 +45,17 @@ FIND_TRAINS: dict[str, Any] = {
             },
             "clock_time": {
                 "type": "string",
-                "description": "시각을 말했을 때만 HH:MM. '네 시쯤'이면 04:00, 오전·오후는 part_of_day로",
+                "description": (
+                    "출발 시각을 말했을 때만 HH:MM. '네 시쯤'이면 04:00, 오전·오후는 part_of_day로"
+                ),
+            },
+            "arrival_clock_time": {
+                "type": "string",
+                "description": (
+                    "선택. 어르신이 도착 시각을 스스로 말했을 때만 HH:MM, 먼저 묻지 않는다. "
+                    "'네 시까지 도착', '네 시엔 거기 있어야 돼'면 04:00, 오전·오후는 part_of_day로. "
+                    "넣으면 출발 시각보다 이 시각을 우선해서 고른다"
+                ),
             },
             "party": {"type": "integer", "minimum": 1, "maximum": 4, "description": "인원, 기본 1"},
             "shift": {
@@ -88,20 +98,6 @@ CANCEL_BOOKING: dict[str, Any] = {
     "parameters": {"type": "object", "properties": {}},
 }
 
-DROP_TRIP: dict[str, Any] = {
-    "type": "function",
-    "name": "drop_trip",
-    "description": (
-        "어르신이 기차를 타고 가는 것 자체를 그만두겠다고 할 때 부른다"
-        "(가기 싫어졌어, 안 갈래, 안 가). 통화 중 어느 단계든 부를 수 있고, "
-        "잡아 둔 자리와 결제 요청도 함께 정리한다. 시간·날짜·역을 바꾸려는 말에는 부르지 않는다."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {"heard": {"type": "string", "description": "어르신이 말한 원래 표현"}},
-    },
-}
-
 END_CALL: dict[str, Any] = {
     "type": "function",
     "name": "end_call",
@@ -121,7 +117,6 @@ TOOLS: list[dict[str, Any]] = [
     SET_SENIOR,
     REQUEST_BOOKING,
     CANCEL_BOOKING,
-    DROP_TRIP,
     SPEAK_SLOWER,
     END_CALL,
 ]

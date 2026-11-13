@@ -173,7 +173,6 @@ class CallSession:
         self._gate_failures = 0
         self._outcome = "abandoned"
         self._rail_source = ""
-        self._trip_dropped = False
         self._search_details: dict[str, Any] = {}
 
         self._tools: dict[str, ToolHandler] = {
@@ -181,7 +180,6 @@ class CallSession:
             "set_senior": self._set_senior,
             "request_booking": self._request_booking,
             "cancel_booking": self._cancel_booking,
-            "drop_trip": self._drop_trip,
             "speak_slower": self._speak_slower,
             "end_call": self._end_call,
         }
@@ -386,7 +384,6 @@ class CallSession:
         await self._respond(items=[output])
 
     async def _find_trains(self, args: dict[str, Any]) -> dict[str, Any]:
-        self._trip_dropped = False
         shift = args.get("shift")
         if shift in ("earlier", "later") and self._current is not None:
             return await self._find_adjacent(shift)
@@ -409,7 +406,9 @@ class CallSession:
         if day is None:
             return {"need": "date", "say": lines.ASK_DATE}
         part = _enum(PartOfDay, args.get("part_of_day"), PartOfDay.ANY)
-        window = resolve_window(day, part, args.get("clock_time"), now)
+        window = resolve_window(
+            day, part, args.get("clock_time"), now, args.get("arrival_clock_time")
+        )
         party = min(max(_int(args.get("party")) or 1, 1), 4)
 
         self._invalidate_proposal()
@@ -462,14 +461,20 @@ class CallSession:
         if transfers and (not suitable or args.get("prefer_transfer") is True):
             # Routes arrive shortest first, and an earlier or later request nearest first; only a
             # named time of day re-ranks them around that time.
-            timed = part is not PartOfDay.ANY or bool(args.get("clock_time"))
+            timed = (
+                part is not PartOfDay.ANY
+                or bool(args.get("clock_time"))
+                or bool(args.get("arrival_clock_time"))
+            )
             picked = (
                 choose_route(transfers, window, now + BOOKING_LEAD)
                 if timed and route_direction not in ("earlier", "later")
                 else transfers[0]
             )
             if picked is not None:
-                choice = Choice(picked.legs[0], None, picked)
+                choice = Choice(
+                    picked.legs[0], None, picked, by_arrival=window.anchor == "arrives"
+                )
                 self._rail_source = "tago"
         if choice is None:
             self._enter(CallState.LISTENING)
@@ -532,7 +537,10 @@ class CallSession:
             self._enter(CallState.PROPOSED)
             side = "앞" if direction == "earlier" else "뒤"
             return {"need": "keep_current", "say": lines.NO_ADJACENT.format(side=side)}
-        return self._propose(Choice(train=nearby, sold_out_preferred=None), current.party)
+        return self._propose(
+            Choice(train=nearby, sold_out_preferred=None, by_arrival=current.by_arrival),
+            current.party,
+        )
 
     async def _set_senior(self, args: dict[str, Any]) -> dict[str, Any]:
         self._senior = bool(args.get("is_senior"))
@@ -542,8 +550,9 @@ class CallSession:
             self._pending_choice = None
             return self._propose(choice, party)
         if self._current is not None:
+            current = self._current
             return self._propose(
-                Choice(self._current.train, None, self._current.itinerary), self._current.party
+                Choice(current.train, None, current.itinerary, current.by_arrival), current.party
             )
         return {"say": lines.SENIOR_NOTED}
 
@@ -569,6 +578,7 @@ class CallSession:
             sold_out_preferred=choice.sold_out_preferred,
             created_at=now,
             itinerary=route,
+            by_arrival=choice.by_arrival,
         )
         self._options[proposal.option_id] = proposal
         self._current = proposal
@@ -579,7 +589,7 @@ class CallSession:
             and not self._search_details.get("api_failed")
         ):
             self._proposal_say = "바로 가는 기차가 없어요. " + self._proposal_say
-        self._proposal_short = speech.reconfirm_route(route)
+        self._proposal_short = speech.reconfirm_route(route, proposal.by_arrival)
         self._expect_proposal = True
         self._consent_misses = 0
         self._enter(CallState.PROPOSED)
@@ -601,7 +611,7 @@ class CallSession:
             "itinerary": itinerary_to_dict(route),
         }
 
-    async def _request_booking(self, args: dict[str, Any]) -> dict[str, Any] | None:
+    async def _request_booking(self, args: dict[str, Any]) -> dict[str, Any]:
         option_id = str(args.get("option_id", ""))
         proposal = self._options.get(option_id)
         now = datetime.now(KST)
@@ -663,8 +673,6 @@ class CallSession:
         done, _ = await asyncio.wait({securing}, timeout=QUICK_HOLD_SECONDS)
         if securing in done:
             secured: Secured = securing.result()
-            if not secured.say:
-                return None
             return {"ok": secured.ok, "say": secured.say}
         self._spawn(self._announce_when_secured(securing))
         return {"ok": True, "status": "waiting", "say": lines.HOLDING}
@@ -746,11 +754,6 @@ class CallSession:
         }
         self._log("hold", **summary)
         self._write(self._deps.store.update_call(self.call_id, {"booking": summary}))
-        if self._trip_dropped:
-            # The caller said they no longer want to go while the seat was being secured.
-            await self._release_hold("caller_dropped_trip")
-            self._outcome = "cancelled"
-            return Secured(ok=False, say="")
 
         train = hold.train
         payment = await self._deps.payments.request(
@@ -791,9 +794,8 @@ class CallSession:
             if waited >= next_filler and not securing.done():
                 await self._say(lines.HOLDING_STILL)
                 next_filler += WAIT_FILLER_EVERY_SECONDS
-        say = securing.result().say
-        if not self.closed and say:
-            await self._say(say)
+        if not self.closed:
+            await self._say(securing.result().say)
 
     async def _await_payment(self, hold: Hold, payment: PaymentRequest) -> None:
         waited = 0.0
@@ -801,12 +803,12 @@ class CallSession:
         for at, reminder in PAYMENT_REMINDERS:
             approved = await self._deps.payments.wait(payment.id, at - waited)
             waited = at
-            if approved or self._payment_gone(payment):
+            if approved or self.closed:
                 break
             await self._say(reminder)
-        if not approved and not self._payment_gone(payment):
+        if not approved and not self.closed:
             approved = await self._deps.payments.wait(payment.id, PAYMENT_GIVE_UP_SECONDS - waited)
-        if self._payment_gone(payment):
+        if self.closed:
             return
         if not approved:
             await self._deps.payments.expire(payment.id)
@@ -830,46 +832,15 @@ class CallSession:
             speech.ticket_message(hold, self._current.party if self._current else 1)
         )
 
-    def _payment_gone(self, payment: PaymentRequest) -> bool:
-        """True once the call ended or the payment was withdrawn (cancelled or trip dropped)."""
-        return self.closed or self._payment_id != payment.id
-
-    async def _withdraw_payment(self) -> None:
-        payment_id, self._payment_id = self._payment_id, None
-        if payment_id:
-            await self._deps.payments.expire(payment_id)
-            self._emit({"type": "payment.expired", "paymentId": payment_id})
-
     async def _cancel_booking(self, args: dict[str, Any]) -> dict[str, Any]:
         if self._hold is None or self._booking is None or self._booking.status == "cancelled":
             return {"ok": False, "say": lines.NOTHING_TO_CANCEL}
-        await self._withdraw_payment()
+        if self._payment_id:
+            await self._deps.payments.expire(self._payment_id)
         await self._release_hold("caller_request")
         self._outcome = "cancelled"
         self._enter(CallState.LISTENING)
         return {"ok": True, "say": lines.CANCELLED}
-
-    async def _drop_trip(self, args: dict[str, Any]) -> dict[str, Any]:
-        """The caller no longer wants to travel: clear everything and ask if anything else is needed."""
-        self._trip_dropped = True
-        held = self._booking is not None and self._booking.status != "cancelled"
-        await self._withdraw_payment()
-        await self._release_hold("caller_dropped_trip")
-        if held:
-            self._outcome = "cancelled"
-        elif self._outcome == "abandoned":
-            self._outcome = "declined"
-        self._current = None
-        self._pending_choice = None
-        self._proposal_short = ""
-        self._expect_proposal = False
-        self._log("trip_dropped", heard=str(args.get("heard") or ""), released=held)
-        self._enter(CallState.LISTENING)
-        return {
-            "ok": True,
-            "say": lines.TRIP_DROPPED,
-            "next": f'더 필요한 게 없다고 하면 "{lines.THANKS_GOODBYE}" 한 문장만 말하고 end_call',
-        }
 
     async def _speak_slower(self, args: dict[str, Any]) -> dict[str, Any]:
         if self._channel is not None:
@@ -892,10 +863,9 @@ class CallSession:
     async def _say_goodbye_and_end(self) -> None:
         with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(self._idle.wait(), timeout=12)
-        farewell = lines.THANKS_GOODBYE if self._trip_dropped else lines.GOODBYE
-        if farewell not in self._last_ai_text:
+        if lines.GOODBYE not in self._last_ai_text:
             self._log("goodbye", added=True)
-            await self._say(farewell)
+            await self._say(lines.GOODBYE)
         await self._end_after_speech()
 
     async def _release_hold(self, reason: str) -> None:
@@ -1043,7 +1013,7 @@ class CallSession:
     def _is_reask(self, text: str) -> bool:
         return (
             text.rstrip().endswith("?")
-            and text not in (lines.GREETING, lines.TRIP_DROPPED)
+            and text != lines.GREETING
             and self.state in (CallState.LISTENING, CallState.SEARCHING)
         )
 
