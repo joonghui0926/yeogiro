@@ -1,6 +1,7 @@
 import { RAIL_MODE_LABEL, STATE_LABEL, type RailMode } from '@yeogiro/contracts'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { CallerName } from '../components/Chips'
 import ui from '../components/ui.module.css'
 import { clock, hhmm, offset, toDate, won } from '../data/format'
 import { completeOperatorJob, useCalls, useEvents, useFlags, useOperatorJobs, type WithId } from '../data/hooks'
@@ -78,7 +79,9 @@ function LiveCall({ call }: { call: WithId<CallDoc> }) {
   return (
     <Link to={`/calls/${call.id}`} className={`${ui.card} ${styles.liveCall}`}>
       <div className={styles.liveHead}>
-        <strong>{call.testerLabel}</strong>
+        <strong>
+          <CallerName call={call} />
+        </strong>
         <span className={`${ui.chip} ${ui.chipInfo}`}>
           <span className={ui.liveDot} />
           {STATE_LABEL[call.state]}

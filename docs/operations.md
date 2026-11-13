@@ -5,7 +5,7 @@
 | 무엇 | 주소 |
 | --- | --- |
 | 테스터 폰 PWA | https://yeogiro-kaist.web.app (데모 테스터로 열림. 테스터별 링크는 콘솔 테스터 탭에서 복사) |
-| 운영 콘솔 PWA | https://yeogiro-kaist.web.app/console/ (계정은 조중휘에게 받기) |
+| 운영 콘솔 PWA | https://yeogiro-kaist.web.app/console/ (로그인 없이 바로 열림. 주소를 아는 사람은 기록을 보고 지울 수 있음) |
 | 통화 서버 | https://yeogiro-call-990320254644.asia-northeast3.run.app/api/health |
 
 ## 배포

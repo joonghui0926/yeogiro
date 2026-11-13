@@ -5,6 +5,7 @@ import contextlib
 import json
 import logging
 import os
+import re
 import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -16,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from yeogiro.adapters.messaging.inbox import mailbox_for
 from yeogiro.adapters.openai.realtime import RealtimeError
 from yeogiro.calls.session import CallSession
 from yeogiro.calls.voice_session import realtime_session
@@ -53,6 +55,14 @@ app.add_middleware(
 class CreateCall(BaseModel):
     token: str
     sdp: str
+    device: str | None = None
+
+
+DEVICE_ID = re.compile(r"[a-z0-9]{6,32}")
+
+
+def _device(value: str | None) -> str | None:
+    return value if value and DEVICE_ID.fullmatch(value) else None
 
 
 class TokenBody(BaseModel):
@@ -104,7 +114,8 @@ async def me(token: str, request: Request) -> dict[str, Any]:
 async def create_call(body: CreateCall, request: Request) -> dict[str, Any]:
     runtime = _runtime(request)
     tester = await _tester(runtime, body.token)
-    live = runtime.registry.live_for(tester.id)
+    device = _device(body.device)
+    live = runtime.registry.live_on(tester.id, device) if device else None
     if live is not None:
         await live.hangup("replaced")
 
@@ -122,6 +133,7 @@ async def create_call(body: CreateCall, request: Request) -> dict[str, Any]:
         {
             "testerId": tester.id,
             "testerLabel": tester.label,
+            "deviceId": device,
             "startedAt": datetime.now(KST),
             "status": "live",
             "state": "dialing",
@@ -132,7 +144,7 @@ async def create_call(body: CreateCall, request: Request) -> dict[str, Any]:
             "openaiCallId": openai_call_id,
         },
     )
-    session = CallSession(call_id, openai_call_id, tester, runtime.deps, flags)
+    session = CallSession(call_id, openai_call_id, tester, runtime.deps, flags, device)
     runtime.registry.add(session)
     task = asyncio.create_task(session.run())
     task.add_done_callback(lambda _: _forget_later(runtime, call_id))
@@ -185,17 +197,17 @@ async def events(call_id: str, token: str, request: Request) -> StreamingRespons
 async def approve_payment(payment_id: str, body: TokenBody, request: Request) -> dict[str, bool]:
     runtime = _runtime(request)
     tester = await _tester(runtime, body.token)
-    session = runtime.registry.live_for(tester.id)
+    session = runtime.registry.awaiting(tester.id, payment_id)
     if session is None or not await session.approve_payment(payment_id):
         raise HTTPException(status_code=409, detail="payment is not pending")
     return {"ok": True}
 
 
 @app.get("/api/inbox")
-async def inbox(token: str, request: Request) -> dict[str, Any]:
+async def inbox(token: str, request: Request, device: str | None = None) -> dict[str, Any]:
     runtime = _runtime(request)
     tester = await _tester(runtime, token)
-    messages = await runtime.store.inbox(tester.id)
+    messages = await runtime.store.inbox(mailbox_for(tester.id, _device(device)))
     return {
         "messages": [
             {"id": m.id, "sender": m.sender, "body": m.body, "sentAt": m.sent_at.isoformat()}

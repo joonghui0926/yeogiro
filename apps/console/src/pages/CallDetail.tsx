@@ -1,8 +1,10 @@
 import { STATE_LABEL, type CallEvent, type GateCheck, type ItinerarySummary, type TrainSummary } from '@yeogiro/contracts'
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ModeChip, OutcomeChip } from '../components/Chips'
 import ui from '../components/ui.module.css'
+import { deleteCallRecord } from '../data/actions'
+import { isDemo } from '../data/demo'
 import { clock, day, duration, hhmm, offset, toDate, won } from '../data/format'
 import { useCallDoc, useEvents, type WithId } from '../data/hooks'
 import styles from './detail.module.css'
@@ -18,6 +20,7 @@ export function CallDetail() {
   const call = useCallDoc(callId)
   const events = useEvents(callId)
   const [pane, setPane] = useState<'timeline' | 'summary'>('timeline')
+  const navigate = useNavigate()
 
   if (call === undefined || events === null) return <div className={ui.empty}>불러오는 중</div>
   if (call === null) return <div className={ui.empty}>통화를 찾을 수 없어요</div>
@@ -39,10 +42,15 @@ export function CallDetail() {
         <h1 className={ui.pageTitle}>
           {call.testerLabel} · {day(started)} {clock(started)}
         </h1>
-        <div className={styles.headChips}>
-          <OutcomeChip call={call} />
-          <ModeChip call={call} />
-          {call.status === 'ended' && <span className={ui.chip}>{duration(call.durationSec)}</span>}
+        <div className={styles.headRow}>
+          <div className={styles.headChips}>
+            <OutcomeChip call={call} />
+            <ModeChip call={call} />
+            {call.status === 'ended' && <span className={ui.chip}>{duration(call.durationSec)}</span>}
+          </div>
+          {call.status === 'ended' && !isDemo() && (
+            <DeleteCall callId={call.id} onDeleted={() => navigate('/calls', { replace: true })} />
+          )}
         </div>
       </header>
 
@@ -272,6 +280,40 @@ function browserLabel(ua = ''): string {
   if (/CriOS|Chrome/i.test(ua)) return '크롬'
   if (/Safari/i.test(ua)) return '사파리'
   return '알 수 없는 브라우저'
+}
+
+function DeleteCall({ callId, onDeleted }: { callId: string; onDeleted: () => void }) {
+  const [step, setStep] = useState<'idle' | 'confirm' | 'busy' | 'failed'>('idle')
+
+  const remove = async () => {
+    setStep('busy')
+    try {
+      await deleteCallRecord(callId)
+      onDeleted()
+    } catch {
+      setStep('failed')
+    }
+  }
+
+  if (step === 'idle') {
+    return (
+      <button className={styles.deleteLink} onClick={() => setStep('confirm')}>
+        기록 삭제
+      </button>
+    )
+  }
+
+  return (
+    <div className={styles.confirm} role="alertdialog" aria-label="통화 기록 삭제">
+      <span>{step === 'failed' ? '지우지 못했어요. 다시 해 볼까요?' : '이 통화 기록을 지울까요? 되돌릴 수 없어요.'}</span>
+      <button className={ui.buttonDanger} disabled={step === 'busy'} onClick={() => void remove()}>
+        {step === 'busy' ? '지우는 중' : '지우기'}
+      </button>
+      <button className={ui.button} disabled={step === 'busy'} onClick={() => setStep('idle')}>
+        취소
+      </button>
+    </div>
+  )
 }
 
 function toItems(events: WithId<CallEvent>[]): Item[] {

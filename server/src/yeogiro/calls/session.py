@@ -111,10 +111,12 @@ class CallSession:
         tester: Tester,
         deps: CallDeps,
         flags: Flags,
+        device: str | None = None,
     ) -> None:
         self.call_id = call_id
         self.voice_call_id = voice_call_id
         self.tester = tester
+        self.device = device
         self.outbound: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
         self.state = CallState.DIALING
 
@@ -181,6 +183,10 @@ class CallSession:
             "speak_slower": self._speak_slower,
             "end_call": self._end_call,
         }
+
+    @property
+    def payment_id(self) -> str | None:
+        return self._payment_id
 
     @property
     def closed(self) -> bool:
@@ -889,7 +895,7 @@ class CallSession:
         await self._deliver(body)
 
     async def _deliver(self, body: str) -> None:
-        message = await self._deps.messenger.send(self.tester.id, body)
+        message = await self._deps.messenger.send(self.tester.id, body, self.device)
         self._emit(
             {
                 "type": "message.received",
