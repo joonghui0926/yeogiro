@@ -27,6 +27,8 @@ from yeogiro.runtime import Runtime, build_runtime
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logging.getLogger("yeogiro").setLevel(os.environ.get("LOG_LEVEL", "INFO"))
+# httpx logs each request URL at INFO, and public-data URLs carry the service key.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 log = logging.getLogger("yeogiro.api")
 
 HEARTBEAT_SECONDS = 15
