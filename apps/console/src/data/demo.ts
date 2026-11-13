@@ -34,7 +34,7 @@ const ROWS: Row[] = [
   { id: 'd2', tester: '테스터 1', startMin: 22, dur: 41, outcome: 'booked', state: 'ended', status: 'ended', reasks: 0, source: 'korail' },
   { id: 'd3', tester: '테스터 5', startMin: 58, dur: 63, outcome: 'booked', state: 'ended', status: 'ended', reasks: 1 },
   { id: 'd4', tester: '테스터 2', startMin: 96, dur: 88, outcome: 'booked', state: 'ended', status: 'ended', reasks: 2 },
-  { id: 'd5', tester: '테스터 7', startMin: 140, dur: 34, outcome: 'no_consent', state: 'ended', status: 'ended', reasks: 1, gateFailures: 2, stoppedAt: 'proposed' },
+  { id: 'd5', tester: '테스터 7', startMin: 140, dur: 34, outcome: 'declined', state: 'ended', status: 'ended', reasks: 1 },
   { id: 'd6', tester: '테스터 4', startMin: 190, dur: 52, outcome: 'booked', state: 'ended', status: 'ended', reasks: 0, source: 'korail' },
   { id: 'd7', tester: '테스터 6', startMin: 240, dur: 29, outcome: 'abandoned', state: 'ended', status: 'ended', reasks: 0, stoppedAt: 'searching' },
   { id: 'd8', tester: '테스터 8', startMin: 300, dur: 71, outcome: 'payment_timeout', state: 'ended', status: 'ended', reasks: 1, stoppedAt: 'payment_pending' },

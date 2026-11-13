@@ -51,20 +51,22 @@
 }
 
 .avatar {
-  width: 128px;
-  height: 128px;
+  width: 152px;
+  height: 152px;
   border-radius: 50%;
-  display: grid;
-  place-items: end center;
   overflow: hidden;
-  background: #d8e0ee;
-  color: #f7f9fc;
+  background: #a9bfe6;
+  color: #fff;
+}
+
+.avatar svg {
+  display: block;
 }
 
 @media (prefers-color-scheme: dark) {
   .avatar {
-    background: #2b3240;
-    color: #4a5466;
+    background: #34425c;
+    color: #7f93b8;
   }
 }
 

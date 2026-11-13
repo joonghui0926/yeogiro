@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { contactFor } from '../../app/contact'
 import type { CallPhase } from '../../call/useCall'
 import { tones } from '../../call/tones'
-import { Bluetooth, Handset, Keypad, Mute, Person, Record, Speaker, Video } from '../../oneui/icons'
+import { Bluetooth, Handset, Keypad, Mute, Record, Silhouette, Speaker, Video } from '../../oneui/icons'
 import styles from './call.module.css'
 
 interface Props {
@@ -57,7 +57,7 @@ export function CallScreen({ phase, digits, elapsed, muted, speaker, onHangup, o
           </div>
         ) : (
           <div className={styles.avatar}>
-            <Person size={72} />
+            <Silhouette size={152} />
           </div>
         )}
       </div>

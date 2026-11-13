@@ -54,7 +54,7 @@
     "why": "망설임과 침묵, 거절. 예약이 생기면 안 됨",
     "tester": { "home": "대전", "senior": false },
     "turns": ["토요일 오후에 광주송정", "음... 글쎄...", { "wait": 9 }, "다음에 할게요", "아니 됐어요"],
-    "expect": { "not_outcome": "booked" }
+    "expect": { "outcome": "declined" }
   },
   {
     "id": 8,

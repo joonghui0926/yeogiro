@@ -12,7 +12,7 @@ export type CallState =
   | 'closing'
   | 'ended'
 
-export type CallOutcome = 'booked' | 'abandoned' | 'no_consent' | 'payment_timeout' | 'cancelled'
+export type CallOutcome = 'booked' | 'declined' | 'abandoned' | 'no_consent' | 'payment_timeout' | 'cancelled'
 
 export interface TrainSummary {
   trainNo: string
@@ -93,6 +93,7 @@ export type CallEvent = EventBase &
     | { kind: 'interrupt' }
     | { kind: 'silence'; action: 'nudge' | 'hangup' }
     | { kind: 'error'; where: string; message: string }
+    | { kind: 'client'; ua?: string; audio?: string; mic?: string }
   )
 
 export interface TesterDoc {
@@ -168,6 +169,7 @@ export const STATE_LABEL: Record<CallState, string> = {
 
 export const OUTCOME_LABEL: Record<CallOutcome, string> = {
   booked: '예약 완료',
+  declined: '예약 안 함',
   abandoned: '중단',
   no_consent: '동의 없음',
   payment_timeout: '결제 안 함',

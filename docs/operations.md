@@ -4,7 +4,7 @@
 
 | 무엇 | 주소 |
 | --- | --- |
-| 테스터 폰 PWA | https://yeogiro-kaist.web.app/t/&lt;토큰&gt; (테스터별 링크는 콘솔 테스터 탭에서 복사) |
+| 테스터 폰 PWA | https://yeogiro-kaist.web.app (데모 테스터로 열림. 테스터별 링크는 콘솔 테스터 탭에서 복사) |
 | 운영 콘솔 PWA | https://yeogiro-kaist.web.app/console/ (계정은 조중휘에게 받기) |
 | 통화 서버 | https://yeogiro-call-990320254644.asia-northeast3.run.app/api/health |
 
@@ -22,6 +22,8 @@ npm run deploy:web
 비밀값은 Secret Manager의 `openai-api-key`, `tago-service-key` 에서 Cloud Run 환경변수로 들어갑니다.
 
 통화 세션이 서버 메모리에 있어서 인스턴스는 1개로 고정합니다. 서버를 다시 배포하면 진행 중인 통화가 끊기니 테스트가 없는 시간에 합니다.
+
+카카오톡 같은 앱 안 브라우저는 소리와 마이크를 막는 경우가 많아서, 폰 앱이 열리면 기본 브라우저로 넘깁니다.
 
 폰 앱의 API와 SSE는 Hosting rewrite의 60초 제한을 피하려고 Cloud Run에 직접 연결합니다.
 

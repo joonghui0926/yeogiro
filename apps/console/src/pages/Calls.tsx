@@ -13,6 +13,7 @@ const FILTERS: Array<[Filter, string]> = [
   ['all', '전체'],
   ['live', '진행 중'],
   ['booked', '예약 완료'],
+  ['declined', '예약 안 함'],
   ['abandoned', '중단'],
   ['no_consent', '동의 없음'],
   ['payment_timeout', '결제 안 함'],

@@ -14,3 +14,4 @@ __pycache__/
 .ruff_cache/
 server/.secrets/
 !apps/phone/.env.production
+!apps/phone/.env.development

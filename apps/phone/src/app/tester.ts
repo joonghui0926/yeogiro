@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'yeogiro.tester'
+const DEFAULT_TOKEN: string | undefined = import.meta.env.VITE_DEFAULT_TESTER
 
 export function resolveTesterToken(): string | null {
   const match = window.location.pathname.match(/^\/t\/([\w-]+)/)
@@ -14,8 +15,8 @@ export function resolveTesterToken(): string | null {
     return fromUrl
   }
   try {
-    return localStorage.getItem(STORAGE_KEY)
+    return localStorage.getItem(STORAGE_KEY) ?? DEFAULT_TOKEN ?? null
   } catch {
-    return null
+    return DEFAULT_TOKEN ?? null
   }
 }

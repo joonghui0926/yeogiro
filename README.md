@@ -7,10 +7,15 @@
 <p align="center">전화 한 통으로 끝나는 기차 예매</p>
 
 <p align="center">
-  <img src="docs/screens/hero.png" width="880" alt="키패드, 통화, 결제, 문자 화면">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screens/hero-dark.png">
+    <img src="docs/screens/hero.png" width="880" alt="키패드, 통화, 결제, 문자 화면">
+  </picture>
 </p>
 
 이번 프로토타입은 전화 한 통으로 기차표를 예매하는 흐름과, 어르신도 쉽게 따라올 수 있는 음성 AI 상담 경험을 보여 드리는 데 초점을 맞췄습니다. 실제 전화번호 연결과 결제 연동은 코레일과의 계약이 필요해서 다음 단계 과제로 남겨 두었습니다.
+
+폰에서 **[yeogiro-kaist.web.app](https://yeogiro-kaist.web.app)** 을 열면 바로 걸어 볼 수 있습니다. 카카오톡에서 열면 기본 브라우저로 넘어갑니다.
 
 ## 어떻게 동작하나요
 
@@ -21,6 +26,13 @@
 5. 모의 카카오페이 결제창에서 결제하면 예약 확인 문자가 도착합니다
 
 열차 시간표와 운임은 실제 정보이고, 예약 번호와 결제는 모의로 처리합니다. 운영자는 콘솔에서 통화마다 대화, 도구 호출, 동의 판정을 그대로 다시 볼 수 있습니다.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screens/console/dark/02-overview-desktop.png">
+    <img src="docs/screens/console/light/02-overview-desktop.png" width="820" alt="운영 콘솔 개요 화면">
+  </picture>
+</p>
 
 <p align="center">
   <img src="docs/figures/figure1-flow.png" width="760" alt="통화 흐름도">

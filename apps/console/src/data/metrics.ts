@@ -13,7 +13,7 @@ export interface Summary {
   stops: Array<[CallState, number]>
 }
 
-const OUTCOME_ORDER: CallOutcome[] = ['booked', 'abandoned', 'no_consent', 'payment_timeout', 'cancelled']
+const OUTCOME_ORDER: CallOutcome[] = ['booked', 'declined', 'abandoned', 'no_consent', 'payment_timeout', 'cancelled']
 
 export function summarize(calls: WithId<CallDoc>[]): Summary {
   const ended = calls.filter((c) => c.status === 'ended')

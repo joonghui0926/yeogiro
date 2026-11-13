@@ -238,6 +238,28 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   )
 }
 
+const AUDIO_LABEL: Record<string, string> = {
+  element: '소리 재생됨',
+  webaudio: '소리 재생됨(대체 경로)',
+  waiting: '소리 아직 안 나옴',
+  failed: '소리 재생 막힘',
+}
+
+const MIC_LABEL: Record<string, string> = {
+  live: '마이크 켜짐',
+  muted: '마이크 신호 없음',
+  ended: '마이크 끊김',
+}
+
+function browserLabel(ua = ''): string {
+  if (/KAKAOTALK/i.test(ua)) return '카카오톡 안 브라우저'
+  if (/SamsungBrowser/i.test(ua)) return '삼성 인터넷'
+  if (/; wv\)/.test(ua)) return '앱 안 브라우저'
+  if (/CriOS|Chrome/i.test(ua)) return '크롬'
+  if (/Safari/i.test(ua)) return '사파리'
+  return '알 수 없는 브라우저'
+}
+
 function toItems(events: WithId<CallEvent>[]): Item[] {
   const items: Item[] = []
   const openTools = new Map<string, Extract<Item, { type: 'tool' }>>()
@@ -301,6 +323,12 @@ function toItems(events: WithId<CallEvent>[]): Item[] {
       case 'error':
         items.push({ type: 'mark', key, t: event.t, tone: 'bad', text: `오류 · ${event.where} · ${event.message.slice(0, 120)}` })
         break
+      case 'client': {
+        const healthy = (event.audio === 'element' || event.audio === 'webaudio') && event.mic === 'live'
+        const text = `단말 · ${browserLabel(event.ua)} · ${AUDIO_LABEL[event.audio ?? ''] ?? '재생 상태 모름'} · ${MIC_LABEL[event.mic ?? ''] ?? '마이크 상태 모름'}`
+        items.push({ type: 'mark', key, t: event.t, tone: healthy ? 'plain' : 'bad', text })
+        break
+      }
     }
   }
   return items

@@ -12,7 +12,13 @@ export function OutcomeChip({ call }: { call: CallDoc }) {
   }
   const outcome = call.outcome ?? 'abandoned'
   const tone =
-    outcome === 'booked' ? styles.chipGood : outcome === 'no_consent' ? styles.chipBad : styles.chipWarn
+    outcome === 'booked'
+      ? styles.chipGood
+      : outcome === 'declined'
+        ? ''
+        : outcome === 'no_consent'
+          ? styles.chipBad
+          : styles.chipWarn
   return <span className={`${styles.chip} ${tone}`}>{OUTCOME_LABEL[outcome]}</span>
 }
 

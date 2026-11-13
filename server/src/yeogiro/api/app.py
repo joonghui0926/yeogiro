@@ -59,6 +59,10 @@ class TokenBody(BaseModel):
     token: str
 
 
+class ConnectedBody(TokenBody):
+    client: dict[str, str] | None = None
+
+
 def _runtime(request: Request) -> Runtime:
     runtime: Runtime = request.app.state.runtime
     return runtime
@@ -136,10 +140,10 @@ async def create_call(body: CreateCall, request: Request) -> dict[str, Any]:
 
 
 @app.post("/api/calls/{call_id}/connected")
-async def connected(call_id: str, body: TokenBody, request: Request) -> dict[str, bool]:
+async def connected(call_id: str, body: ConnectedBody, request: Request) -> dict[str, bool]:
     runtime = _runtime(request)
     session = _session(runtime, call_id, await _tester(runtime, body.token))
-    await session.on_media_connected()
+    await session.on_media_connected(body.client)
     return {"ok": True}
 
 

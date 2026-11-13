@@ -121,6 +121,13 @@ export const Person = (p: IconProps) => (
   </Svg>
 )
 
+export const Silhouette = ({ size, ...rest }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden="true" {...rest}>
+    <circle cx="50" cy="40" r="19" fill="currentColor" />
+    <ellipse cx="50" cy="101" rx="36" ry="32" fill="currentColor" />
+  </svg>
+)
+
 export const Outgoing = (p: IconProps) => (
   <Svg {...p}>
     <path d="M7 17 17 7M9 7h8v8" {...stroke} />

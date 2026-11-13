@@ -1,7 +1,9 @@
 import type { InboxMessage, PaymentRequest, PhoneEvent } from '@yeogiro/contracts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RecentCall } from '../app/recents'
+import { setInCall } from '../app/updates'
 import { api } from '../data/api'
+import { unlockPlayback } from './playback'
 import { openMicrophone, tones } from './tones'
 
 export type CallPhase = 'idle' | 'dialing' | 'connected' | 'ended' | 'failed'
@@ -14,7 +16,7 @@ export interface CallHandlers {
 
 interface Live {
   pc?: RTCPeerConnection
-  events?: EventSource
+  events?: { close: () => void }
   stopMic?: () => void
   stopRing?: () => void
   track?: MediaStreamTrack
@@ -73,7 +75,10 @@ export function useCall(token: string | null, phoneBand: boolean, handlers: Call
       const durationSec = current.connectedAt ? Math.round((Date.now() - current.connectedAt) / 1000) : 0
       handlersRef.current.onFinished({ digits: current.digits, at: Date.now(), durationSec })
       setPhase(by === 'error' ? 'failed' : 'ended')
-      window.setTimeout(() => setPhase('idle'), END_SCREEN_MS)
+      window.setTimeout(() => {
+        setPhase('idle')
+        setInCall(false)
+      }, END_SCREEN_MS)
     },
     [release, token],
   )
@@ -109,7 +114,9 @@ export function useCall(token: string | null, phoneBand: boolean, handlers: Call
       setPhase('dialing')
 
       const startedAt = performance.now()
+      setInCall(true)
       tones.unlock()
+      const playback = unlockPlayback()
       live.current.stopRing = tones.ringback()
       live.current.wakeLock = await navigator.wakeLock?.request('screen').catch(() => undefined)
 
@@ -120,12 +127,7 @@ export function useCall(token: string | null, phoneBand: boolean, handlers: Call
 
         const pc = new RTCPeerConnection()
         live.current.pc = pc
-        pc.ontrack = (track) => {
-          const audio = remoteAudio()
-          audio.srcObject = track.streams[0]
-          audio.volume = 1
-          void audio.play().catch(() => undefined)
-        }
+        pc.ontrack = (event) => playback.attach(event.streams[0])
         pc.addTrack(mic.track)
         pc.createDataChannel('oai-events')
 
@@ -147,7 +149,11 @@ export function useCall(token: string | null, phoneBand: boolean, handlers: Call
         pc.onconnectionstatechange = () => {
           if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) finish('remote')
         }
-        await api.connected(token, created.callId)
+        await api.connected(token, created.callId, {
+          ua: navigator.userAgent,
+          audio: playback.state(),
+          mic: mic.track.muted ? 'muted' : mic.track.readyState,
+        })
       } catch (error) {
         console.error(error)
         finish('error')

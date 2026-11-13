@@ -80,6 +80,9 @@ _PROGRESS = (
 )
 
 
+CLIENT_FIELDS = ("ua", "audio", "mic")
+
+
 @dataclass(frozen=True, slots=True)
 class CallDeps:
     voice: VoiceCalls
@@ -208,10 +211,13 @@ class CallSession:
         finally:
             await self.hangup("system")
 
-    async def on_media_connected(self) -> None:
+    async def on_media_connected(self, client: dict[str, str] | None = None) -> None:
         if self._media_ready.is_set():
             return
         self._media_ready.set()
+        report = {key: str(value)[:200] for key, value in (client or {}).items() if key in CLIENT_FIELDS}
+        if report:
+            self._log("client", **report)
         await asyncio.wait_for(self._channel_ready.wait(), timeout=10)
         self._enter(CallState.GREETING)
         await self._respond(instructions=greeting_instructions())
@@ -706,6 +712,8 @@ class CallSession:
         return {"ok": True, "say_short": self._proposal_short or None}
 
     async def _end_call(self, args: dict[str, Any]) -> None:
+        if self._outcome == "abandoned" and self._current is not None:
+            self._outcome = "declined"
         self._enter(CallState.CLOSING)
         self._spawn(self._say_goodbye_and_end())
         return None
@@ -866,7 +874,7 @@ class CallSession:
         self._write(self._deps.store.update_call(self.call_id, {"state": state.value}))
 
     async def _finalize(self, ended_by: str) -> None:
-        stopped_at = None if self._outcome == "booked" else self._furthest.value
+        stopped_at = None if self._outcome in ("booked", "declined") else self._furthest.value
         with contextlib.suppress(Exception):
             await self._deps.store.update_call(
                 self.call_id,
