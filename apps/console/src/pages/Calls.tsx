@@ -1,7 +1,7 @@
 import { STATE_LABEL, type CallOutcome } from '@yeogiro/contracts'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ModeChip, OutcomeChip } from '../components/Chips'
+import { CallerName, ModeChip, OutcomeChip } from '../components/Chips'
 import ui from '../components/ui.module.css'
 import { duration, toDate, when } from '../data/format'
 import { useCalls } from '../data/hooks'
@@ -70,7 +70,9 @@ export function Calls() {
                 {rows.map((call) => (
                   <tr key={call.id} onClick={() => navigate(`/calls/${call.id}`)}>
                     <td className="num">{when(toDate(call.startedAt))}</td>
-                    <td>{call.testerLabel}</td>
+                    <td>
+                      <CallerName call={call} />
+                    </td>
                     <td>
                       <OutcomeChip call={call} />
                     </td>
@@ -90,7 +92,9 @@ export function Calls() {
             {rows.map((call) => (
               <button key={call.id} className={styles.callCard} onClick={() => navigate(`/calls/${call.id}`)}>
                 <span className={styles.cardTop}>
-                  <strong>{call.testerLabel}</strong>
+                  <strong>
+                    <CallerName call={call} />
+                  </strong>
                   <OutcomeChip call={call} />
                 </span>
                 <span className={styles.cardMeta}>

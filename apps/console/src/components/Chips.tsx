@@ -27,3 +27,12 @@ export function ModeChip({ call }: { call: CallDoc }) {
   const label = source === 'korail' ? '코레일 실예약' : RAIL_MODE_LABEL[call.railMode]
   return <span className={styles.chip}>{label}</span>
 }
+
+export function CallerName({ call }: { call: CallDoc }) {
+  return (
+    <>
+      {call.testerLabel}
+      {call.deviceId && <span className={styles.device}>{call.deviceId.slice(0, 4)}</span>}
+    </>
+  )
+}

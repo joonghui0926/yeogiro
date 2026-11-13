@@ -1,6 +1,6 @@
 import { OUTCOME_LABEL, STATE_LABEL } from '@yeogiro/contracts'
 import { useNavigate } from 'react-router-dom'
-import { ModeChip, OutcomeChip } from '../components/Chips'
+import { CallerName, ModeChip, OutcomeChip } from '../components/Chips'
 import ui from '../components/ui.module.css'
 import { Donut, Meter, MiniStat, Sparkline, StatusStrip } from '../components/viz'
 import styles from './overview.module.css'
@@ -86,7 +86,9 @@ export function Overview() {
                   {recent.map((call) => (
                     <tr key={call.id} onClick={() => navigate(`/calls/${call.id}`)}>
                       <td className="num">{when(toDate(call.startedAt))}</td>
-                      <td>{call.testerLabel}</td>
+                      <td>
+                        <CallerName call={call} />
+                      </td>
                       <td>
                         <OutcomeChip call={call} />
                       </td>

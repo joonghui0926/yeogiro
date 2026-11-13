@@ -1,4 +1,5 @@
 import type { InboxMessage, PhoneEvent } from '@yeogiro/contracts'
+import { deviceId } from '../app/device'
 
 const BASE = import.meta.env.VITE_API_BASE ?? ''
 
@@ -42,9 +43,11 @@ async function get<T>(path: string): Promise<T> {
 export const api = {
   me: (token: string) => get<Me>(`/api/me?token=${encodeURIComponent(token)}`),
   inbox: (token: string) =>
-    get<{ messages: InboxMessage[] }>(`/api/inbox?token=${encodeURIComponent(token)}`).then((r) => r.messages),
+    get<{ messages: InboxMessage[] }>(`/api/inbox?token=${encodeURIComponent(token)}&device=${deviceId()}`).then(
+      (r) => r.messages,
+    ),
   createCall: (token: string, sdp: string) =>
-    post<{ callId: string; sdp: string; phoneBand: boolean }>('/api/calls', { token, sdp }),
+    post<{ callId: string; sdp: string; phoneBand: boolean }>('/api/calls', { token, sdp, device: deviceId() }),
   connected: (token: string, callId: string, client: ClientReport) =>
     post<{ ok: boolean }>(`/api/calls/${callId}/connected`, { token, client }, OTHER_INSTANCE_RETRIES),
   hangup: (token: string, callId: string) =>

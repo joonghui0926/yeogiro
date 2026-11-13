@@ -324,3 +324,11 @@
     padding: 18px;
   }
 }
+
+.device {
+  margin-left: 6px;
+  font-family: var(--mono);
+  font-size: 0.82em;
+  font-weight: 500;
+  color: var(--muted);
+}
