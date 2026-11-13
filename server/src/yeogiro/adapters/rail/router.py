@@ -4,7 +4,7 @@ import logging
 from dataclasses import replace
 from datetime import date, datetime, time
 
-from yeogiro.adapters.rail.itineraries import RouteSearch, TransferPolicy, TransferSearch
+from yeogiro.adapters.rail.itineraries import HubFinder, RouteSearch, TransferPolicy, TransferSearch
 from yeogiro.adapters.rail.jobs import AssistRail, WorkerRail
 from yeogiro.adapters.rail.mock import MockRail
 from yeogiro.adapters.rail.tago import TagoTimetable
@@ -24,14 +24,20 @@ class RailRouter:
         worker: WorkerRail | None,
         assist: AssistRail | None,
         transfer_policy: TransferPolicy | None = None,
+        hubs: HubFinder | None = None,
+        sample_on_failure: bool = False,
     ) -> None:
         self._timetable = timetable
         self._mock = mock
         self._worker = worker
         self._assist = assist
+        self._sample_on_failure = sample_on_failure
         self._transfer = (
             TransferSearch(
-                timetable.search, timetable.station_names, transfer_policy or TransferPolicy()
+                timetable.search,
+                timetable.station_names,
+                transfer_policy or TransferPolicy(),
+                hubs,
             )
             if isinstance(timetable, TagoTimetable)
             else None
@@ -54,6 +60,8 @@ class RailRouter:
             if self._transfer:
                 return await self._transfer.search(dep, arr, window, earliest, [], True)
             return RouteSearch((), self._timetable.name, False, False, True)
+        if source == self._mock.name:
+            return RouteSearch(tuple(Itinerary((t,)) for t in trains), source, bool(trains))
         choice = choose_train(trains, window, earliest, force_sold_out)
         suitable = (
             choice is not None and window.start <= choice.train.departs_at.time() <= window.end
@@ -82,7 +90,14 @@ class RailRouter:
                 return await self._fill_fares(trains, dep, arr, day), self._worker.name
             except RailUnavailable as error:
                 log.warning("korail search unavailable, falling back: %s", error)
-        return await self._timetable.search(dep, arr, day), self._timetable.name
+        try:
+            return await self._timetable.search(dep, arr, day), self._timetable.name
+        except RailUnavailable as error:
+            if self._sample_on_failure:
+                # A sample timetable keeps the demo call going when TAGO is down or throttled.
+                log.warning("timetable unavailable, using mock: %s", error)
+                return await self._mock.search(dep, arr, day), self._mock.name
+            raise
 
     async def hold_route(self, request: HoldRequest, route: Itinerary, mode: RailMode) -> Hold:
         if len(route.legs) == 1:

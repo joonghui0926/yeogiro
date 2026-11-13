@@ -25,6 +25,9 @@ class TransferPolicy:
             raise ValueError("transfer search limits must be positive")
 
 
+HubFinder = Callable[[str, str, TravelWindow, datetime], Awaitable[list[str]]]
+
+
 @dataclass(frozen=True, slots=True)
 class RouteSearch:
     routes: tuple[Itinerary, ...]
@@ -40,10 +43,12 @@ class TransferSearch:
         search: Callable[[str, str, date], Awaitable[list[Train]]],
         stations: Callable[[], Awaitable[list[str]]],
         policy: TransferPolicy,
+        hubs: HubFinder | None = None,
     ) -> None:
         self._search = search
         self._stations = stations
         self.policy = policy
+        self._hubs = hubs
 
     async def search(
         self,
@@ -134,8 +139,18 @@ class TransferSearch:
                         route = Itinerary((train,))
                         routes[route.key] = route
                 stations = await self._stations()
-                # A bounded worker pool avoids creating a task per station or a hub shortlist.
-                candidates = iter(sorted(set(stations) - {dep, arr}))
+                if self._hubs is None:
+                    shortlist = sorted(set(stations) - {dep, arr})
+                else:
+                    # The full timetable already knows where the fastest transfers are, so TAGO
+                    # only confirms those few stations instead of scanning the whole directory.
+                    try:
+                        preferred = await self._hubs(dep, arr, window, earliest)
+                    except RailUnavailable:
+                        preferred, complete = [], False
+                    known = set(stations)
+                    shortlist = [s for s in preferred if s in known and s not in (dep, arr)]
+                candidates = iter(shortlist)
 
                 async def worker() -> None:
                     nonlocal complete

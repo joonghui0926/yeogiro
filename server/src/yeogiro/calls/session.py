@@ -21,7 +21,7 @@ from yeogiro.calls.prompt import greeting_instructions, progress_message
 from yeogiro.config import KST
 from yeogiro.domain import consent, fares, speech
 from yeogiro.domain.models import Choice, Hold, Itinerary, Proposal
-from yeogiro.domain.selection import adjacent_train, choose_train
+from yeogiro.domain.selection import adjacent_train, choose_route, choose_train
 from yeogiro.domain.stations import is_supported
 from yeogiro.domain.when import BOOKING_LEAD, PartOfDay, RelativeDay, resolve_day, resolve_window
 from yeogiro.ports import (
@@ -457,9 +457,17 @@ class CallSession:
         )
         transfers = [r for r in routes if len(r.legs) == 2]
         if transfers and (not suitable or args.get("prefer_transfer") is True):
-            route = transfers[0]
-            choice = Choice(route.legs[0], None, route)
-            self._rail_source = "tago"
+            # Routes arrive shortest first, and an earlier or later request nearest first; only a
+            # named time of day re-ranks them around that time.
+            timed = part is not PartOfDay.ANY or bool(args.get("clock_time"))
+            picked = (
+                choose_route(transfers, window, now + BOOKING_LEAD)
+                if timed and route_direction not in ("earlier", "later")
+                else transfers[0]
+            )
+            if picked is not None:
+                choice = Choice(picked.legs[0], None, picked)
+                self._rail_source = "tago"
         if choice is None:
             self._enter(CallState.LISTENING)
             return {
@@ -567,12 +575,8 @@ class CallSession:
             and not self._search_details.get("direct_found")
             and not self._search_details.get("api_failed")
         ):
-            self._proposal_say = (
-                "직통 열차는 조회되지 않았지만 환승 경로가 있어요. " + self._proposal_say
-            )
-        self._proposal_short = (
-            self._proposal_say if len(route.legs) > 1 else speech.reconfirm_sentence(proposal.train)
-        )
+            self._proposal_say = "바로 가는 기차가 없어요. " + self._proposal_say
+        self._proposal_short = speech.reconfirm_route(route)
         self._expect_proposal = True
         self._consent_misses = 0
         self._enter(CallState.PROPOSED)
@@ -766,15 +770,7 @@ class CallSession:
         )
         self._log("payment", status="requested", amount=payment.amount)
         self._spawn(self._await_payment(hold, payment))
-        return Secured(
-            ok=True,
-            say=(
-                "두 구간의 모의 예약을 준비했어요. 실제 좌석을 확보한 것은 아니에요. "
-                + lines.PAY_PROMPT
-            )
-            if hold.itinerary
-            else lines.PAY_PROMPT,
-        )
+        return Secured(ok=True, say=lines.PAY_PROMPT)
 
     async def _announce_when_secured(self, securing: asyncio.Task[Secured]) -> None:
         waited = 0.0
@@ -876,9 +872,13 @@ class CallSession:
     async def _send_train_info(self, proposal: Proposal) -> None:
         if proposal.itinerary and len(proposal.itinerary.legs) > 1:
             await self._deliver(
-                "[여기로] 환승 열차 안내\n"
-                + speech.route_description(proposal.itinerary)
-                + "\n예약되지 않았습니다. 좌석 재고는 미확인입니다."
+                "\n".join(
+                    [
+                        "[여기로] 환승 열차 안내",
+                        *speech.route_lines(proposal.itinerary),
+                        "예약되지 않았습니다.",
+                    ]
+                )
             )
             return
         train = proposal.train

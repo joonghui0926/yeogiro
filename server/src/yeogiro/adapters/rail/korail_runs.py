@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 from collections import defaultdict
 from datetime import date, datetime, timedelta
@@ -10,13 +11,16 @@ from typing import Any
 import httpx
 
 from yeogiro.config import KST, REPO_ROOT
-from yeogiro.domain.routing import Connection, Timetable
+from yeogiro.domain.models import TravelWindow
+from yeogiro.domain.routing import MIN_TRANSFER, Connection, Timetable
 from yeogiro.ports import RailUnavailable
 
 BASE = "https://openapis.korail.com/api/run/v2/travelerTrainRunInfo"
 CACHE_DIR = REPO_ROOT / "server" / ".cache" / "korail_runs"
 PAGE_SIZE = 1000
 MAX_PAGES = 30
+HUB_LIMIT = 3
+WARM_DAYS = 7
 
 
 def sample_day(day: date, today: date) -> date:
@@ -35,16 +39,46 @@ class KorailRuns:
     confirm the chosen trains against TAGO for that day before offering them.
     """
 
-    def __init__(self, service_key: str, http: httpx.AsyncClient) -> None:
+    def __init__(
+        self, service_key: str, http: httpx.AsyncClient, min_transfer: timedelta = MIN_TRANSFER
+    ) -> None:
         self._key = service_key
         self._http = http
+        self._min_transfer = min_transfer
         self._rows: dict[date, list[dict[str, str]]] = {}
+        self._tables: dict[tuple[date, date], Timetable] = {}
         self._lock = asyncio.Lock()
 
     async def timetable(self, day: date, today: date) -> Timetable:
         source = sample_day(day, today)
-        rows = await self._stops(source)
-        return Timetable(connections(rows, day - source))
+        if (day, source) not in self._tables:
+            rows = await self._stops(source)
+            if len(self._tables) > 2 * WARM_DAYS:
+                self._tables.clear()
+            self._tables[(day, source)] = Timetable(connections(rows, day - source))
+        return self._tables[(day, source)]
+
+    async def hubs(self, dep: str, arr: str, window: TravelWindow, earliest: datetime) -> list[str]:
+        """Transfer stations of the fastest one-transfer journeys, best first."""
+        table = await self.timetable(window.day, datetime.now(KST).date())
+        start = max(datetime.combine(window.day, window.start, KST), earliest)
+        end = datetime.combine(window.day, window.end, KST)
+        journeys = [
+            j
+            for j in table.options(dep, arr, start, end, max_legs=2, min_transfer=self._min_transfer)
+            if j.transfers == 1
+        ]
+        journeys.sort(key=lambda j: (j.duration, j.departs_at))
+        ordered: list[str] = []
+        for journey in journeys:
+            if journey.legs[0].arr not in ordered:
+                ordered.append(journey.legs[0].arr)
+        return ordered[:HUB_LIMIT]
+
+    async def warm(self, today: date) -> None:
+        for offset in range(WARM_DAYS):
+            day = today + timedelta(days=offset)
+            await self.timetable(day, today)
 
     async def _stops(self, day: date) -> list[dict[str, str]]:
         async with self._lock:
@@ -55,8 +89,9 @@ class KorailRuns:
                 rows: list[dict[str, str]] = json.loads(path.read_text(encoding="utf-8"))
             else:
                 rows = await self._fetch(day)
-                CACHE_DIR.mkdir(parents=True, exist_ok=True)
-                path.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
+                with contextlib.suppress(OSError):
+                    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+                    path.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
             self._rows[day] = rows
             return rows
 

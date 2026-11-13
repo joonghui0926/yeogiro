@@ -222,9 +222,10 @@ async def test_transfer_reaches_voice_consent_booking_payment_and_message(
     result = await session._find_trains({**args(), "relative_day": "tomorrow"})
     assert result["status"] == "transfer_found"
     assert result["itinerary"]["legs"][1]["arr"] == "강릉"
-    assert "직통 열차는 조회되지 않았지만" in result["say"]
-    assert "101번" in result["say"] and "201번" in result["say_short"]
-    assert "모의 예약" in result["say"] and "미확인" not in result["facts"]["요금"]
+    assert result["say"].startswith("바로 가는 기차가 없어요.")
+    assert "한 번 갈아타요" in result["say"] and "101" not in result["say"]
+    assert "갈아타서" in result["say_short"] and result["say"].endswith("예약할까요?")
+    assert "확인 안 됨" not in result["facts"]["요금"]
     assert result["facts"]["구간"] == "대전에서 강릉"
     session._proposal_completed = True
     session._replies = ["두 구간 모두 예약해 주세요"]
@@ -243,7 +244,7 @@ async def test_transfer_reaches_voice_consent_booking_payment_and_message(
     assert store.bookings["bk_c"].status == "paid"
     message = store.messages["demo"][0].body
     assert all(h.pnr in message for h in hold.leg_holds)
-    assert "별도 예약" in message and "실제 좌석 확보" in message
+    assert "환승 1회" in message and "체험용 예약" in message
     await session.hangup("caller")
 
 
@@ -286,7 +287,7 @@ async def test_transfer_gate_requires_consent_and_complete_playback(
     session._replies = ["음"]
     result = await session._request_booking({"option_id": proposal["option_id"]})
     assert not result["ok"] and not store.bookings and not store.payments
-    assert "201번" in result["say"]
+    assert "갈아타서" in result["say"]
     await session.hangup("caller")
 
 
@@ -306,7 +307,8 @@ async def test_unknown_segment_fare_blocks_payment_without_announcing_zero_total
     session, store = call_session(Timetable(trains))
     proposal = session._propose(Choice(trains[0], None, Itinerary(tuple(trains))), 1)
     assert proposal["itinerary"]["fare"] is None and proposal["train"]["fareTotal"] is None
-    assert "운임 미확인" in proposal["facts"]["요금"]
+    assert proposal["facts"]["요금"] == "확인 안 됨"
+    assert "예약할 수 없어요" in proposal["say"]
     assert session._current is not None
     result = await session._secure(session._current)
     assert not result.ok and not store.bookings and not store.payments
@@ -334,11 +336,12 @@ async def test_next_day_speech_and_senior_fares_follow_each_leg_date() -> None:
     session, _ = call_session(Timetable([first, second]))
     session._senior = True
     result = session._propose(Choice(first, None, Itinerary((first, second))), 2)
-    assert "11월 21일" in result["say"]
+    assert "21일 토요일 새벽 한 시 삼십 분 강릉 도착" in result["say"]
     assert result["train"]["fareTotal"] == 37000  # Friday: 7,000+10,000; Saturday: 20,000.
     assert fares.fare_total(first, 2, True) == 17000
     assert "21일" in result["facts"]["도착"]
-    assert speech.route_description(Itinerary((first, second))) in result["say_short"]
+    assert "중간역에서 기다렸다가" not in result["say"]
+    assert "21일" in speech.route_description(Itinerary((first, second)))
     await session.hangup("caller")
 
 

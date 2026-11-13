@@ -18,6 +18,8 @@ log = logging.getLogger(__name__)
 
 BASE = "https://apis.data.go.kr/1613000/TrainInfo"
 STATION_CACHE = REPO_ROOT / "server" / ".cache" / "tago_stations.json"
+# Names Korail and the voice flow use for stations TAGO spells differently.
+ALIASES = {"여수엑스포": "여수EXPO", "S수서": "수서", "S동탄": "동탄"}
 
 
 class TagoTimetable:
@@ -81,7 +83,7 @@ class TagoTimetable:
                 return self._stations
             cached = _load_cache()
             if cached:
-                self._stations = cached
+                self._stations = _with_aliases(cached)
                 return self._stations
             cities = await self._items("GetCtyCodeList", {"numOfRows": 100})
             lists = await asyncio.gather(
@@ -101,8 +103,8 @@ class TagoTimetable:
                 raise RailUnavailable("invalid TAGO station directory") from error
             if not directory:
                 raise RailUnavailable("empty TAGO station directory")
-            self._stations = directory
-            _save_cache(self._stations)
+            _save_cache(directory)
+            self._stations = _with_aliases(directory)
             return self._stations
 
     async def _items(self, operation: str, params: dict[str, Any]) -> list[dict[str, Any]]:
@@ -156,6 +158,11 @@ class TagoTimetable:
 
 def _stamp(value: Any) -> datetime:
     return datetime.strptime(str(value), "%Y%m%d%H%M%S").replace(tzinfo=KST)
+
+
+def _with_aliases(directory: dict[str, str]) -> dict[str, str]:
+    extra = {ours: directory[theirs] for ours, theirs in ALIASES.items() if theirs in directory}
+    return {**directory, **extra}
 
 
 def _load_cache() -> dict[str, str]:

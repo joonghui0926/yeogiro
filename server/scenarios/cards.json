@@ -72,5 +72,14 @@
     "pay": false,
     "turns": ["내일 점심 먹고 서울", "네, 해 주세요", { "wait": 70 }],
     "expect": { "outcome": "payment_timeout" }
+  },
+  {
+    "id": 10,
+    "name": "바로 가는 기차 없음",
+    "why": "직통이 없는 강릉을 한 번 갈아타는 길로 짧게 안내하고, 어디서 갈아타는지 물으면 답해야 함",
+    "tester": { "home": "대전", "senior": false },
+    "rail": "live",
+    "turns": ["내일 아침에 강릉 가려고", "어디서 갈아타요?", "그럼 그걸로 해 줘"],
+    "expect": { "outcome": "booked", "max_reasks": 1 }
   }
 ]

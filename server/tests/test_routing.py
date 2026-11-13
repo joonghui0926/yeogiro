@@ -80,3 +80,29 @@ def test_rows_become_connections_shifted_to_the_day() -> None:
     ]
     [c] = connections(rows, timedelta(days=7))
     assert (c.dep, c.arr, c.departs_at, c.arrives_at) == ("대전", "서울", at("07:17"), at("08:32"))
+
+
+def test_transfer_choice_follows_the_requested_time_of_day() -> None:
+    from yeogiro.domain.models import Itinerary, Train, TravelWindow
+    from yeogiro.domain.selection import choose_route
+
+    def leg(no: str, dep: str, arr: str, start: str, end: str) -> Train:
+        return Train(no, "KTX", dep, arr, at(start), at(end), 10000, None)
+
+    early = Itinerary((leg("1", "대전", "서울", "07:17", "08:32"), leg("2", "서울", "강릉", "08:57", "11:09")))
+    late = Itinerary((leg("3", "대전", "서울", "11:26", "12:30"), leg("4", "서울", "강릉", "12:56", "14:56")))
+    window = TravelWindow(DAY, datetime.strptime("06:00", "%H:%M").time(), datetime.strptime("12:00", "%H:%M").time(), datetime.strptime("09:00", "%H:%M").time())
+    assert choose_route([late, early], window, at("05:00")) is early
+
+
+def test_transfer_choice_avoids_a_long_wait_on_the_platform() -> None:
+    from yeogiro.domain.models import Itinerary, Train, TravelWindow
+    from yeogiro.domain.selection import choose_route
+
+    def leg(no: str, dep: str, arr: str, start: str, end: str) -> Train:
+        return Train(no, "KTX", dep, arr, at(start), at(end), 10000, None)
+
+    short_wait = Itinerary((leg("144", "대전", "서울", "08:09", "09:20"), leg("809", "서울", "강릉", "09:56", "12:06")))
+    long_wait = Itinerary((leg("14", "대전", "서울", "09:07", "10:10"), leg("813", "서울", "강릉", "12:10", "14:14")))
+    window = TravelWindow(DAY, datetime.strptime("06:00", "%H:%M").time(), datetime.strptime("12:00", "%H:%M").time(), datetime.strptime("09:00", "%H:%M").time())
+    assert choose_route([long_wait, short_wait], window, at("05:00")) is short_wait

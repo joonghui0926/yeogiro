@@ -80,14 +80,23 @@ def read_grade(grade: str) -> str:
 def proposal_sentence(proposal: Proposal, today: date, senior_discounted: bool) -> str:
     itinerary = proposal.itinerary
     if itinerary and len(itinerary.legs) > 1:
-        route = itinerary
-        fare = read_won(proposal.fare_total) if route.fare is not None else "일부 구간 운임 미확인"
-        return (
-            f"{read_day(route.legs[0].departs_at.date(), today)} "
-            f"{route_description(route)} {proposal.party}명 예상 합계 {fare}이에요. "
-            "좌석 재고는 확인되지 않았어요. 각 열차를 별도로 모의 예약하며 실제 결제는 없어요. "
-            "두 구간 모두 이 여정으로 모의 예약할까요?"
+        first, last = itinerary.legs[0], itinerary.legs[-1]
+        arrival_day = (
+            read_day(last.arrives_at.date(), today) + " "
+            if last.arrives_at.date() != first.departs_at.date()
+            else ""
         )
+        trip = (
+            f"{read_day(first.departs_at.date(), today)}, {first.arr}에서 한 번 갈아타요. "
+            f"{read_clock(first.departs_at.time())} {first.dep} 출발, "
+            f"{arrival_day}{read_clock(last.arrives_at.time())} {last.arr} 도착, "
+            f"모두 {read_duration(int(itinerary.duration.total_seconds() // 60))}"
+        )
+        if itinerary.fare is None:
+            return f"{trip} 걸려요. 요금이 확인되지 않아 지금은 예약할 수 없어요."
+        people = f"{proposal.party}명 " if proposal.party > 1 else ""
+        discount = "경로 할인해서 " if senior_discounted else ""
+        return f"{trip}, {people}{discount}{read_won(proposal.fare_total)}이에요. 예약할까요?"
     train = proposal.train
     parts: list[str] = []
     if proposal.sold_out_preferred is not None:
@@ -104,38 +113,45 @@ def proposal_sentence(proposal: Proposal, today: date, senior_discounted: bool) 
     discount = " 경로 할인해서" if senior_discounted else ""
     parts.append(f"{route_text} {times}{people}{discount} {read_won(proposal.fare_total)}이에요.")
     parts.append("예약할까요?")
-    if train.seats_available is None:
-        parts.insert(-1, "시간표 기준 안내이며 좌석 재고는 확인되지 않았어요.")
     if train.fare <= 0:
         return f"{route_description(Itinerary((train,)))} 운임과 좌석은 미확인이에요. 운임 확인 후 예약을 도와드릴게요."
     return " ".join(parts)
 
 
 def route_description(route: Itinerary) -> str:
+    """Every train of the journey in spoken form, for when the caller asks for details."""
     day = route.legs[0].departs_at.date()
 
     def stamp(value: datetime) -> str:
         prefix = f"{value.month}월 {value.day}일 " if value.date() != day else ""
         return prefix + read_clock(value.time())
 
-    legs = [
-        f"{index}번째 열차 {read_grade(t.grade)} {t.train_no}번, {t.dep}에서 "
-        f"{stamp(t.departs_at)} 출발, {t.arr}에 {stamp(t.arrives_at)} 도착."
-        for index, t in enumerate(route.legs, 1)
-    ]
-    transfer = (
-        (
-            f"{route.legs[0].arr}역에서 한 번 갈아타며 "
-            f"환승 대기 {read_duration(route.wait_minutes)}이에요. "
+    spoken: list[str] = []
+    for index, train in enumerate(route.legs):
+        if index:
+            wait = read_duration(route.wait_minutes)
+            spoken.append(f"{train.dep}에서 {wait} 기다렸다가")
+        order = ("첫 기차 " if index == 0 else "두 번째 기차 ") if len(route.legs) > 1 else ""
+        spoken.append(
+            f"{order}{read_grade(train.grade)} {stamp(train.departs_at)} {train.dep} 출발, "
+            f"{stamp(train.arrives_at)} {train.arr} 도착."
         )
-        if len(route.legs) > 1
-        else ""
-    )
-    return (
-        transfer
-        + " ".join(legs)
-        + f" 전체 소요시간 {read_duration(int(route.duration.total_seconds() // 60))}이에요."
-    )
+    return " ".join(spoken)
+
+
+def route_lines(route: Itinerary, holds: tuple[Hold, ...] = ()) -> list[str]:
+    """The journey as short text lines for a message."""
+    marks = "①②"
+    lines: list[str] = []
+    for index, train in enumerate(route.legs):
+        if index:
+            lines.append(f"   {train.dep}에서 {route.wait_minutes}분 갈아타기")
+        seat = f" · {holds[index].seat}" if index < len(holds) and holds[index].seat else ""
+        lines.append(
+            f"{marks[index]} {train.grade} {train.train_no} {train.departs_at:%H:%M} {train.dep}"
+            f" → {train.arrives_at:%H:%M} {train.arr}{seat}"
+        )
+    return lines
 
 
 def read_duration(minutes: int) -> str:
@@ -152,19 +168,23 @@ def read_duration(minutes: int) -> str:
 def proposal_facts(proposal: Proposal, today: date, senior_discounted: bool) -> dict[str, str]:
     if proposal.itinerary and len(proposal.itinerary.legs) > 1:
         route = proposal.itinerary
+        first, last = route.legs[0], route.legs[-1]
         return {
-            "날짜": read_day(route.legs[0].departs_at.date(), today),
-            "구간": f"{route.legs[0].dep}에서 {route.legs[-1].arr}",
-            "출발": read_clock(route.legs[0].departs_at.time()),
-            "도착": f"{read_day(route.legs[-1].arrives_at.date(), today)} {read_clock(route.legs[-1].arrives_at.time())}",
+            "날짜": read_day(first.departs_at.date(), today),
+            "구간": f"{first.dep}에서 {last.arr}",
+            "출발": read_clock(first.departs_at.time()),
+            "도착": f"{read_day(last.arrives_at.date(), today)} {read_clock(last.arrives_at.time())}",
             "걸리는 시간": read_duration(int(route.duration.total_seconds() // 60)),
-            "요금": f"예상 합계 {read_won(proposal.fare_total)}"
+            "갈아타는 곳": f"{first.arr}역, {read_duration(route.wait_minutes)} 기다림",
+            "요금": (
+                f"경로 할인해서 {read_won(proposal.fare_total)}"
+                if senior_discounted
+                else read_won(proposal.fare_total)
+            )
             if route.fare is not None
-            else "일부 구간 운임 미확인",
+            else "확인 안 됨",
             "열차": route_description(route),
             "인원": f"{proposal.party}명",
-            "좌석": "재고 미확인",
-            "예약": "각 구간 별도 모의 예약, 실제 결제 없음",
         }
     train = proposal.train
     fare = read_won(proposal.fare_total)
@@ -185,22 +205,34 @@ def proposal_facts(proposal: Proposal, today: date, senior_discounted: bool) -> 
     }
 
 
+def reconfirm_route(route: Itinerary) -> str:
+    if len(route.legs) == 1:
+        return reconfirm_sentence(route.legs[0])
+    last = route.legs[-1]
+    return (
+        f"{route.legs[0].arr}에서 한 번 갈아타서 {read_clock(last.arrives_at.time())}에 "
+        f"{last.arr} 도착하는 기차예요. 예약할까요?"
+    )
+
+
 def reconfirm_sentence(train: Train) -> str:
     return f"{read_clock(train.departs_at.time())}에 {train.arr} 가는 기차예요. 예약할까요?"
 
 
 def ticket_message(hold: Hold, party: int) -> str:
     if hold.itinerary and hold.leg_holds:
+        first = hold.itinerary.legs[0]
+        last = hold.itinerary.legs[-1]
+        people = f" · {party}명" if party > 1 else ""
         return "\n".join(
             [
-                "[여기로] 환승 여정 모의 예약 확인 · 구간별 별도 예약",
-                route_description(hold.itinerary),
-                *(
-                    f"{i}구간 {h.train.dep}→{h.train.arr} · 예약번호 {h.pnr} · {h.seat} · {h.fare_total:,}원"
-                    for i, h in enumerate(hold.leg_holds, 1)
-                ),
-                f"{party}명 합계 {hold.fare_total:,}원",
-                "체험용입니다. 실제 좌석 확보·발권·결제는 되지 않았습니다.",
+                "[여기로] 예약 확인 · 환승 1회",
+                f"{first.departs_at.month}월 {first.departs_at.day}일"
+                f"({_WEEKDAYS[first.departs_at.weekday()]}) {first.dep}→{last.arr}",
+                *route_lines(hold.itinerary, hold.leg_holds),
+                f"{hold.fare_total:,}원{people}",
+                f"예약번호 {' · '.join(h.pnr for h in hold.leg_holds)}",
+                "체험용 예약입니다. 실제 결제는 되지 않았고 곧 자동 취소됩니다.",
             ]
         )
     train = hold.train
