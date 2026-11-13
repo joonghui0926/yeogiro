@@ -72,6 +72,79 @@ class TestChooseTrain:
         assert choice is not None and choice.train.departs_at.time() == time(15, 40)
 
 
+class TestAskedTime:
+    """A named departure or arrival time: at or before it first, then the closest."""
+
+    day = THURSDAY + timedelta(days=5)
+    now = datetime(2026, 11, 12, tzinfo=KST)
+
+    def window(self, asked: time, anchor: str = "departs") -> TravelWindow:
+        return TravelWindow(self.day, time(5), time(23, 59), asked, asked, anchor)  # type: ignore[arg-type]
+
+    def test_arrival_time_alone_resolves(self) -> None:
+        now = datetime.combine(THURSDAY, time(9, 0), KST)
+        window = resolve_window(self.day, PartOfDay.ANY, None, now, "04:00")
+        assert window.asked == time(16, 0)
+        assert window.anchor == "arrives"
+        assert window.start <= time(10, 0) and window.end == time(16, 0)
+
+    def test_arrival_wins_when_both_given(self) -> None:
+        now = datetime.combine(THURSDAY, time(9, 0), KST)
+        window = resolve_window(self.day, PartOfDay.AFTERNOON, "01:00", now, "05:00")
+        assert (window.asked, window.anchor) == (time(17, 0), "arrives")
+
+    def test_departure_prefers_earlier_over_closer_later(self) -> None:
+        trains = [train(14, 40), train(15, 5), train(9, 0), train(10, 0)]
+        choice = choose_train(trains, self.window(time(15)), self.now)
+        assert choice is not None and choice.train.departs_at.time() == time(14, 40)
+        assert not choice.by_arrival
+
+    def test_closest_earlier_beats_many_early_trains(self) -> None:
+        trains = [train(h, 0) for h in range(6, 14)] + [train(14, 30)]
+        choice = choose_train(trains, self.window(time(15)), self.now)
+        assert choice is not None and choice.train.departs_at.time() == time(14, 30)
+
+    def test_departure_falls_back_to_closest_later(self) -> None:
+        trains = [train(15, 40), train(15, 10), train(18, 0)]
+        choice = choose_train(trains, self.window(time(15)), self.now)
+        assert choice is not None and choice.train.departs_at.time() == time(15, 10)
+
+    def test_arrival_ranks_by_arrival_time(self) -> None:
+        # 13:00 KTX arrives 14:04, 12:50 slow train arrives 15:20, 14:00 KTX arrives 15:04.
+        trains = [train(13, 0), train(12, 50, minutes=150), train(14, 0)]
+        choice = choose_train(trains, self.window(time(15), "arrives"), self.now)
+        assert choice is not None
+        assert choice.train.arrives_at.time() == time(14, 4)
+        assert choice.by_arrival
+
+    def test_arrival_sold_out_keeps_the_same_rule(self) -> None:
+        trains = [train(13, 50, seats=False), train(12, 0), train(13, 0), train(15, 0)]
+        choice = choose_train(trains, self.window(time(15), "arrives"), self.now)
+        assert choice is not None and choice.sold_out_preferred is not None
+        assert choice.sold_out_preferred.departs_at.time() == time(13, 50)
+        assert choice.train.departs_at.time() == time(13, 0)
+
+    def test_transfer_route_ranks_by_final_arrival(self) -> None:
+        from yeogiro.domain.models import Itinerary
+        from yeogiro.domain.selection import choose_route
+
+        def leg(dep: str, arr: str, h: int, m: int, minutes: int) -> Train:
+            departs = datetime.combine(self.day, time(h, m), KST)
+            return Train("1", "KTX", dep, arr, departs, departs + timedelta(minutes=minutes), 1, True)
+
+        early = Itinerary((leg("A", "B", 9, 0, 60), leg("B", "C", 10, 30, 60)))  # 11:30
+        close = Itinerary((leg("A", "B", 12, 0, 60), leg("B", "C", 13, 20, 60)))  # 14:20
+        late = Itinerary((leg("A", "B", 13, 0, 60), leg("B", "C", 14, 10, 60)))  # 15:10
+        picked = choose_route([early, late, close], self.window(time(15), "arrives"), self.now)
+        assert picked is close
+
+    def test_respects_booking_lead(self) -> None:
+        now = datetime.combine(self.day, time(14, 50), KST)
+        trains = [train(14, 30), train(15, 30)]
+        choice = choose_train(trains, self.window(time(15)), now)
+        assert choice is not None and choice.train.departs_at.time() == time(15, 30)
+
+
 class TestSpeech:
     def test_won(self) -> None:
         assert speech.read_won(13020) == "만 삼천이십 원"
@@ -89,6 +162,30 @@ class TestSpeech:
             "17일 화요일 대전에서 서울, KTX 오후 두 시 육 분 출발, 오후 세 시 십 분 도착, "
             "이만 삼천칠백 원이에요. 예약할까요?"
         )
+
+    def test_arrival_proposal_reads_both_times(self) -> None:
+        proposal = Proposal(
+            "opt", train(14, 6), 1, False, 23700, None, datetime.now(KST), by_arrival=True
+        )
+        text = speech.proposal_sentence(proposal, THURSDAY, False)
+        assert "오후 두 시 육 분 출발" in text and "오후 세 시 십 분 도착" in text
+        assert speech.reconfirm_sentence(proposal.train, True) == (
+            "오후 두 시 육 분에 출발해서 오후 세 시 십 분에 서울 도착하는 기차예요. 예약할까요?"
+        )
+
+    def test_arrival_sold_out_names_arrival_time(self) -> None:
+        proposal = Proposal(
+            "opt",
+            train(13, 0),
+            1,
+            False,
+            23700,
+            train(13, 50, seats=False),
+            datetime.now(KST),
+            by_arrival=True,
+        )
+        text = speech.proposal_sentence(proposal, THURSDAY, False)
+        assert text.startswith("오후 두 시 오십사 분 도착 기차는 자리가 다 찼어요.")
 
     def test_ticket_message_has_no_link(self) -> None:
         hold = Hold("12345678", train(14, 6), 23700, "3호차 7A", None, "mock")

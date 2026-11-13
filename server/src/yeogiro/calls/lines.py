@@ -3,11 +3,11 @@
 Sentences the model composes on its own are limited to answers built from tool facts.
 """
 
-GREETING = "여기로 기차 예약 AI예요. 어디로, 언제 가세요?"
+GREETING = "여기로 기차 예약 AI예요. 어디로, 언제 출발하세요?"
 
 ASK_DEPARTURE = "어디서 타세요?"
 ASK_ARRIVAL = "어디로 가세요?"
-ASK_DATE = "며칠에 가세요?"
+ASK_DATE = "언제 출발하세요?"
 ASK_SENIOR = "만 65세 넘으셨어요?"
 
 NO_SEATS_THAT_DAY = "{day}에는 {arrival} 가는 기차 자리가 없어요. 다른 날로 찾아볼까요?"
