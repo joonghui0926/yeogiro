@@ -1,8 +1,6 @@
 import { RAIL_MODE_LABEL } from '@yeogiro/contracts'
-import { signOut } from 'firebase/auth'
 import type { ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { auth } from '../app/firebase'
 import { useCalls, useFlags } from '../data/hooks'
 import styles from './layout.module.css'
 
@@ -43,9 +41,6 @@ export function Layout() {
           <span className={flags.bookingEnabled ? styles.on : styles.off}>
             {flags.bookingEnabled ? '예약 받는 중' : '예약 멈춤'}
           </span>
-          <button className={styles.signOut} onClick={() => void signOut(auth)}>
-            {(auth.currentUser?.email ?? '').split('@')[0].toUpperCase() || '운영자'} · 로그아웃
-          </button>
         </div>
       </aside>
 

@@ -5,25 +5,8 @@
   padding: 24px;
 }
 
-.gate {
-  display: grid;
-  justify-items: center;
-  gap: 14px;
-  text-align: center;
-  max-width: 360px;
-}
-
-.gate img {
-  border-radius: 16px;
-}
-
-.gate h1 {
-  margin: 8px 0 0;
-  font-size: 24px;
-  font-weight: 700;
-}
-
-.gate p {
-  margin: 0 0 10px;
+.error {
+  margin: 0;
   color: var(--muted);
+  font-size: 15px;
 }
