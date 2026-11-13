@@ -2,44 +2,46 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAdmin() {
+    // The console opens without a login, so it signs in anonymously.
+    function isOperator() {
       return request.auth != null
-        && request.auth.token.email == 'kaist_101@yeogiro.local';
+        && (request.auth.token.firebase.sign_in_provider == 'anonymous'
+            || request.auth.token.email == 'kaist_101@yeogiro.local');
     }
 
     match /calls/{callId} {
-      allow read, delete: if isAdmin();
+      allow read, delete: if isOperator();
       match /events/{eventId} {
-        allow read, delete: if isAdmin();
+        allow read, delete: if isOperator();
       }
     }
 
     match /testers/{testerId} {
-      allow read: if isAdmin();
+      allow read: if isOperator();
     }
 
     match /bookings/{bookingId} {
-      allow read, delete: if isAdmin();
+      allow read, delete: if isOperator();
     }
 
     match /payments/{paymentId} {
-      allow read, delete: if isAdmin();
+      allow read, delete: if isOperator();
     }
 
     match /inbox/{testerId}/messages/{messageId} {
-      allow read: if isAdmin();
+      allow read: if isOperator();
     }
 
     match /railJobs/{jobId} {
-      allow read: if isAdmin();
-      allow update: if isAdmin()
+      allow read: if isOperator();
+      allow update: if isOperator()
         && resource.data.handler == 'operator'
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['status', 'result', 'error', 'doneAt', 'operator']);
     }
 
     match /config/runtime {
-      allow read, write: if isAdmin();
+      allow read, write: if isOperator();
     }
   }
 }
