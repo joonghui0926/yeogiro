@@ -101,6 +101,8 @@ npm run typecheck && npm run build
 
 ## 더 보기
 
+[환승 경로 검색: 설계·설정·제약](docs/transfer-search.md). 직통편을 우선 추천하고, 조건에 맞는 직통편이 없으면 실제 TAGO 시간표로 1회 환승 경로를 찾습니다. 시간표 조회는 좌석 재고 확인이 아니며, 환승 예약은 구간별 모의 예약만 지원합니다.
+
 [기획안](docs/plan.md) · [화면 모음](docs/screens/README.md) · [배포와 운영](docs/operations.md)
 
 ## 기여
