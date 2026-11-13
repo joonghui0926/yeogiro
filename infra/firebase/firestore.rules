@@ -8,9 +8,9 @@ service cloud.firestore {
     }
 
     match /calls/{callId} {
-      allow read: if isAdmin();
+      allow read, delete: if isAdmin();
       match /events/{eventId} {
-        allow read: if isAdmin();
+        allow read, delete: if isAdmin();
       }
     }
 
@@ -19,11 +19,11 @@ service cloud.firestore {
     }
 
     match /bookings/{bookingId} {
-      allow read: if isAdmin();
+      allow read, delete: if isAdmin();
     }
 
     match /payments/{paymentId} {
-      allow read: if isAdmin();
+      allow read, delete: if isAdmin();
     }
 
     match /inbox/{testerId}/messages/{messageId} {
