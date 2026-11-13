@@ -175,6 +175,7 @@ class CallSession:
         self._rail_source = ""
         self._trip_dropped = False
         self._search_details: dict[str, Any] = {}
+        self._ticket_sent = False
 
         self._tools: dict[str, ToolHandler] = {
             "find_trains": self._find_trains,
@@ -245,6 +246,10 @@ class CallSession:
         self._enter(CallState.ENDED)
         with contextlib.suppress(Exception):
             await self._deps.voice.hangup(self.voice_call_id)
+        if self._booking is not None and self._booking.status == "paid" and self._hold is not None:
+            # A caller who hangs up right after paying still gets the ticket.
+            with contextlib.suppress(Exception):
+                await self._send_ticket(self._hold)
         self._emit({"type": "call.ended", "by": by})
         if self._payment_id:
             await self._deps.payments.expire(self._payment_id)
@@ -826,6 +831,12 @@ class CallSession:
             await self._deps.store.save_booking(self._booking)
         await self._say(lines.PAID)
         await asyncio.sleep(SMS_DELAY_SECONDS)
+        await self._send_ticket(hold)
+
+    async def _send_ticket(self, hold: Hold) -> None:
+        if self._ticket_sent:
+            return
+        self._ticket_sent = True
         await self._deliver(
             speech.ticket_message(hold, self._current.party if self._current else 1)
         )

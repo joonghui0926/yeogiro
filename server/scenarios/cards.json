@@ -165,5 +165,13 @@
     "pay": false,
     "turns": ["내일 아침에 강릉 가려고", "네, 그걸로 해 줘", { "wait": 4 }, "아이고 그냥 안 갈래", "없어"],
     "expect": { "outcome": "cancelled", "tools": ["drop_trip"], "after": { "tool": "drop_trip", "never_say": ["노란", "결제 버튼"] } }
+  },
+  {
+    "id": 21,
+    "name": "날짜 묻는 사이 시간 바꿈",
+    "why": "처음엔 오후 여섯 시라더니 날짜를 묻자 두 시쯤 출발로 바꿈. 바꾼 시간으로 찾아야 함",
+    "tester": { "home": "대전", "senior": false },
+    "turns": ["서울역으로 오후 여섯 시에 가고 싶어", "오후 두 시쯤 출발하면 좋을 것 같아", "모레로 해 줘", "그렇게 해 줘"],
+    "expect": { "outcome": "booked", "depart_between": ["13:00", "15:30"] }
   }
 ]

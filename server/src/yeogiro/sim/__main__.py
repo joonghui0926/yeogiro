@@ -32,7 +32,7 @@ from yeogiro.ports import Flags, RailMode, Tester
 from yeogiro.sim.line import TextVoice
 
 CARDS = Path(__file__).resolve().parents[3] / "scenarios" / "cards.json"
-QUIET_HOLD_SECONDS = 1.2
+QUIET_HOLD_SECONDS = 2.0
 TURN_TIMEOUT_SECONDS = 45.0
 
 
@@ -147,6 +147,16 @@ def _speech_checks(events: list[dict[str, Any]], expect: dict[str, Any]) -> list
         checks.append(start is not None and not any(p in t for t in later for p in rule["never_say"]))
     if "last_ai" in expect:
         checks.append(bool(said) and expect["last_ai"] in said[-1]["text"])
+    if "depart_between" in expect:
+        low, high = expect["depart_between"]
+        offers = [
+            e["result"]["train"]["departsAt"][11:16]
+            for e in events
+            if e["kind"] == "tool_result"
+            and e.get("name") == "find_trains"
+            and (e.get("result") or {}).get("train")
+        ]
+        checks.append(bool(offers) and low <= offers[-1] <= high)
     return checks
 
 
