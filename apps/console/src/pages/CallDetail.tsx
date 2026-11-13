@@ -1,4 +1,4 @@
-import { STATE_LABEL, type CallEvent, type GateCheck, type TrainSummary } from '@yeogiro/contracts'
+import { STATE_LABEL, type CallEvent, type GateCheck, type ItinerarySummary, type TrainSummary } from '@yeogiro/contracts'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ModeChip, OutcomeChip } from '../components/Chips'
@@ -29,6 +29,7 @@ export function CallDetail() {
   const gate = [...events].reverse().find((e): e is WithId<Extract<CallEvent, { kind: 'gate' }>> => e.kind === 'gate')
   const proposal = lastProposal(events)
   const train = call.booking?.train ?? proposal?.train
+  const itinerary = call.booking?.itinerary ?? proposal?.itinerary
   const payment = [...events].reverse().find((e) => e.kind === 'payment') as Extract<CallEvent, { kind: 'payment' }> | undefined
   const started = toDate(call.startedAt)
 
@@ -72,12 +73,24 @@ export function CallDetail() {
 
         <aside className={styles.summary}>
           <Panel title="열차">
-            {train ? (
+            {itinerary?.kind === 'transfer' ? (
+              <>
+                <p>{itinerary.transferStation} 환승 · 대기 {itinerary.waitMinutes}분 · 전체 {itinerary.durationMinutes}분</p>
+                {itinerary.legs.map((leg, index) => (
+                  <div key={`${leg.trainNo}-${index}`}>
+                    <p>{index + 1}구간 · {day(new Date(leg.departsAt))} → {day(new Date(leg.arrivesAt))}</p>
+                    <TrainCard train={leg} fare={leg.fare > 0 ? leg.fare : undefined} />
+                    {call.booking?.legHolds?.[index] && <p>모의 예약번호 {call.booking.legHolds[index].pnr} · {call.booking.legHolds[index].seat}</p>}
+                  </div>
+                ))}
+                <p>{itinerary.fare === null ? '일부 구간 운임 미확인' : won(call.booking?.fareTotal ?? proposal?.fareTotal ?? itinerary.fare)} · 구간별 별도 모의 예약</p>
+              </>
+            ) : train ? (
               <TrainCard train={train} fare={call.booking?.fareTotal ?? proposal?.fareTotal} />
             ) : (
               <p className={ui.muted}>제안 전에 끝났어요</p>
             )}
-            {call.booking && (
+            {call.booking && itinerary?.kind !== 'transfer' && (
               <dl className={styles.facts}>
                 <dt>예약번호</dt>
                 <dd className="num">{call.booking.pnr}</dd>
@@ -215,7 +228,7 @@ function GateList({ checks, compact = false }: { checks: GateCheck[]; compact?: 
   )
 }
 
-function TrainCard({ train, fare }: { train: TrainSummary; fare?: number }) {
+function TrainCard({ train, fare }: { train: TrainSummary; fare?: number | null }) {
   return (
     <div className={styles.train}>
       <div className={styles.trainRoute}>
@@ -231,7 +244,8 @@ function TrainCard({ train, fare }: { train: TrainSummary; fare?: number }) {
       </div>
       <p className={styles.trainMeta}>
         {train.grade} {train.trainNo} · {new Date(train.departsAt).getMonth() + 1}/{new Date(train.departsAt).getDate()} ·{' '}
-        {won(fare ?? train.fare)}
+        {(fare ?? train.fare) > 0 ? won(fare ?? train.fare) : '운임 미확인'}
+        {train.seatsAvailable === null && ' · 좌석 재고 미확인'}
       </p>
     </div>
   )
@@ -336,7 +350,7 @@ function toItems(events: WithId<CallEvent>[]): Item[] {
         }
         break
       case 'hold':
-        items.push({ type: 'mark', key, t: event.t, tone: 'good', text: `좌석 확보 · 예약번호 ${event.pnr} · ${providerLabel(event.provider)}` })
+        items.push({ type: 'mark', key, t: event.t, tone: 'good', text: `${event.itinerary?.kind === 'transfer' ? '구간별 모의 예약 준비' : '좌석 확보'} · 예약번호 ${event.pnr} · ${providerLabel(event.provider)}` })
         break
       case 'hold_failed':
         items.push({ type: 'mark', key, t: event.t, tone: 'bad', text: `좌석 확보 실패 · ${event.reason}` })
@@ -376,11 +390,11 @@ function toItems(events: WithId<CallEvent>[]): Item[] {
   return items
 }
 
-function lastProposal(events: CallEvent[]): { train: TrainSummary; fareTotal?: number } | null {
+function lastProposal(events: CallEvent[]): { train: TrainSummary; fareTotal?: number | null; itinerary?: ItinerarySummary } | null {
   for (const event of [...events].reverse()) {
-    if (event.kind === 'tool_result' && event.name === 'find_trains' && event.result?.train) {
-      const train = event.result.train as TrainSummary & { fareTotal?: number }
-      return { train, fareTotal: train.fareTotal }
+    if (event.kind === 'tool_result' && (event.name === 'find_trains' || event.name === 'set_senior') && event.result?.train) {
+      const train = event.result.train as TrainSummary & { fareTotal?: number | null }
+      return { train, fareTotal: train.fareTotal, itinerary: event.result.itinerary as ItinerarySummary | undefined }
     }
   }
   return null

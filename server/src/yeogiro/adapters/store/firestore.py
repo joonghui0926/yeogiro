@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
-from google.cloud import firestore
+from google.cloud import firestore_v1 as firestore
 
 from yeogiro.ports import BookingRecord, Flags, InboxMessage, RailMode, Tester
 

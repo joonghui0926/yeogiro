@@ -6,6 +6,7 @@ const edge = process.env.BROWSER ?? 'C:/Program Files (x86)/Microsoft/Edge/Appli
 const ROOT = fileURLToPath(new URL('../docs/screens', import.meta.url))
 const PHONE = 'http://localhost:5199'
 const CONSOLE = 'http://localhost:5174/console'
+const transferOnly = process.argv.includes('--transfer-only')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const clickText = (page, text) =>
@@ -80,6 +81,7 @@ const consoleShots = [
   ['04-call-detail', `${CONSOLE}/calls/d4?demo=1`],
   ['05-live', `${CONSOLE}/live?demo=1`],
   ['06-testers', `${CONSOLE}/testers?demo=1`],
+  ['07-transfer', `${CONSOLE}/calls/transfer?demo=1`],
 ]
 
 const browser = await puppeteer.launch({ executablePath: edge, headless: 'new', args: ['--force-color-profile=srgb'] })
@@ -87,7 +89,7 @@ for (const scheme of ['light', 'dark']) {
   fs.mkdirSync(`${ROOT}/phone/${scheme}`, { recursive: true })
   fs.mkdirSync(`${ROOT}/console/${scheme}`, { recursive: true })
 
-  for (const [name, act] of phoneShots) {
+  for (const [name, act] of transferOnly ? [] : phoneShots) {
     const ctx = await browser.createBrowserContext()
     const p = await ctx.newPage()
     await p.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }])
@@ -98,7 +100,7 @@ for (const scheme of ['light', 'dark']) {
     await ctx.close()
   }
 
-  for (const [name, url] of consoleShots) {
+  for (const [name, url] of consoleShots.filter(([name]) => !transferOnly || name === '07-transfer')) {
     for (const [device, vp] of [['desktop', { width: 1366, height: 900, deviceScaleFactor: 1.5 }], ['mobile', { width: 412, height: 892, deviceScaleFactor: 2, isMobile: true, hasTouch: true }]]) {
       const ctx = await browser.createBrowserContext()
       const p = await ctx.newPage()
@@ -106,6 +108,7 @@ for (const scheme of ['light', 'dark']) {
       await p.setViewport(vp)
       await p.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 })
       await sleep(1600)
+      if (name === '07-transfer' && device === 'mobile') await clickText(p, '판정과 요약')
       await p.screenshot({ path: `${ROOT}/console/${scheme}/${name}-${device}.png`, fullPage: device === 'desktop' && name !== '04-call-detail' })
       await ctx.close()
     }

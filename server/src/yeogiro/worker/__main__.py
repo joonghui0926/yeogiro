@@ -7,7 +7,7 @@ import os
 from datetime import date, datetime, time
 from typing import Any
 
-from google.cloud import firestore
+from google.cloud import firestore_v1 as firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 from yeogiro.adapters.rail.codec import (

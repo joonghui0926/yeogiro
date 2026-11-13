@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from yeogiro.config import KST
-from yeogiro.domain.models import Hold, Train
+from yeogiro.domain.models import Hold, Itinerary, Train
 
 
 def train_to_dict(train: Train) -> dict[str, Any]:
@@ -29,7 +29,7 @@ def train_from_dict(data: dict[str, Any]) -> Train:
         departs_at=_aware(datetime.fromisoformat(data["departsAt"])),
         arrives_at=_aware(datetime.fromisoformat(data["arrivesAt"])),
         fare=int(data.get("fare") or 0),
-        seats_available=bool(data.get("seatsAvailable", True)),
+        seats_available=data.get("seatsAvailable"),
     )
 
 
@@ -41,6 +41,8 @@ def hold_to_dict(hold: Hold) -> dict[str, Any]:
         "seat": hold.seat,
         "payBy": hold.pay_by.isoformat() if hold.pay_by else None,
         "provider": hold.provider,
+        "itinerary": itinerary_to_dict(hold.itinerary) if hold.itinerary else None,
+        "legHolds": [hold_to_dict(leg) for leg in hold.leg_holds],
     }
 
 
@@ -53,7 +55,27 @@ def hold_from_dict(data: dict[str, Any]) -> Hold:
         seat=data.get("seat"),
         pay_by=_aware(datetime.fromisoformat(pay_by)) if pay_by else None,
         provider=str(data["provider"]),
+        itinerary=itinerary_from_dict(data["itinerary"]) if data.get("itinerary") else None,
+        leg_holds=tuple(hold_from_dict(leg) for leg in data.get("legHolds", [])),
     )
+
+
+def itinerary_to_dict(route: Itinerary) -> dict[str, Any]:
+    return {
+        "kind": "transfer" if len(route.legs) > 1 else "direct",
+        "legs": [train_to_dict(t) for t in route.legs],
+        "transferCount": len(route.legs) - 1,
+        "transferStation": route.legs[0].arr if len(route.legs) > 1 else None,
+        "waitMinutes": route.wait_minutes,
+        "durationMinutes": int(route.duration.total_seconds() // 60),
+        "fare": route.fare,
+        "seatAvailability": "unknown" if any(t.seats_available is None for t in route.legs)
+        else "available" if all(t.seats_available for t in route.legs) else "unavailable",
+    }
+
+
+def itinerary_from_dict(data: dict[str, Any]) -> Itinerary:
+    return Itinerary(tuple(train_from_dict(leg) for leg in data["legs"]))
 
 
 def mask_pnr(pnr: str) -> str:

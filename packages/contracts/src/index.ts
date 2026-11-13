@@ -22,7 +22,18 @@ export interface TrainSummary {
   departsAt: string
   arrivesAt: string
   fare: number
-  seatsAvailable: boolean
+  seatsAvailable: boolean | null
+}
+
+export interface ItinerarySummary {
+  kind: 'direct' | 'transfer'
+  legs: TrainSummary[]
+  transferCount: number
+  transferStation: string | null
+  waitMinutes: number
+  durationMinutes: number
+  fare: number | null
+  seatAvailability: 'unknown' | 'available' | 'unavailable'
 }
 
 export interface BookingSummary {
@@ -31,6 +42,8 @@ export interface BookingSummary {
   fareTotal: number
   seat: string | null
   train: TrainSummary
+  itinerary?: ItinerarySummary | null
+  legHolds?: BookingSummary[]
 }
 
 export interface FirestoreTimestamp {

@@ -4,7 +4,7 @@ import asyncio
 from datetime import date, time
 from typing import Any
 
-from google.cloud import firestore
+from google.cloud import firestore_v1 as firestore
 
 from yeogiro.adapters.rail.codec import hold_from_dict, hold_to_dict, train_from_dict, train_to_dict
 from yeogiro.domain.models import Hold, Train
