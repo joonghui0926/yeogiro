@@ -14,13 +14,13 @@ from typing import Any, Literal
 
 from yeogiro.adapters.messaging.inbox import InAppMessenger
 from yeogiro.adapters.payment.mock_onetouch import MockOneTouch, PaymentRequest
-from yeogiro.adapters.rail.codec import mask_pnr, train_to_dict
+from yeogiro.adapters.rail.codec import hold_to_dict, itinerary_to_dict, mask_pnr, train_to_dict
 from yeogiro.adapters.rail.router import RailRouter
 from yeogiro.calls import lines
 from yeogiro.calls.prompt import greeting_instructions, progress_message
 from yeogiro.config import KST
 from yeogiro.domain import consent, fares, speech
-from yeogiro.domain.models import Choice, Hold, Proposal
+from yeogiro.domain.models import Choice, Hold, Itinerary, Proposal
 from yeogiro.domain.selection import adjacent_train, choose_train
 from yeogiro.domain.stations import is_supported
 from yeogiro.domain.when import BOOKING_LEAD, PartOfDay, RelativeDay, resolve_day, resolve_window
@@ -171,6 +171,7 @@ class CallSession:
         self._gate_failures = 0
         self._outcome = "abandoned"
         self._rail_source = ""
+        self._search_details: dict[str, Any] = {}
 
         self._tools: dict[str, ToolHandler] = {
             "find_trains": self._find_trains,
@@ -215,7 +216,9 @@ class CallSession:
         if self._media_ready.is_set():
             return
         self._media_ready.set()
-        report = {key: str(value)[:200] for key, value in (client or {}).items() if key in CLIENT_FIELDS}
+        report = {
+            key: str(value)[:200] for key, value in (client or {}).items() if key in CLIENT_FIELDS
+        }
         if report:
             self._log("client", **report)
         await asyncio.wait_for(self._channel_ready.wait(), timeout=10)
@@ -400,21 +403,76 @@ class CallSession:
         window = resolve_window(day, part, args.get("clock_time"), now)
         party = min(max(_int(args.get("party")) or 1, 1), 4)
 
+        self._invalidate_proposal()
         self._enter(CallState.SEARCHING)
-        trains, self._rail_source = await self._deps.rail.search(
-            departure, arrival, day, window.start, self._rail_mode, self.call_id
-        )
         flags = await self._deps.store.flags()
+        result = await self._deps.rail.search_routes(
+            departure,
+            arrival,
+            window,
+            now + BOOKING_LEAD,
+            self._rail_mode,
+            self.call_id,
+            include_transfers=args.get("include_transfers") is True
+            or args.get("prefer_transfer") is True,
+            force_sold_out=flags.force_sold_out,
+        )
+        self._rail_source = result.source
+        routes = list(result.routes)
+        route_direction = args.get("route_direction")
+        if route_direction in ("earlier", "later"):
+            anchor = datetime.fromisoformat(args["route_departure"])
+            routes = [
+                r
+                for r in routes
+                if (
+                    r.legs[0].departs_at < anchor
+                    if route_direction == "earlier"
+                    else r.legs[0].departs_at > anchor
+                )
+            ]
+            routes.sort(key=lambda r: abs((r.legs[0].departs_at - anchor).total_seconds()))
+        self._search_details = {
+            "direct_found": result.direct_found,
+            "search_complete": result.complete,
+            "api_failed": result.api_failed,
+            "alternatives": [
+                itinerary_to_dict(r)
+                for r in (
+                    [r for r in routes if len(r.legs) == 1][:5]
+                    + [r for r in routes if len(r.legs) == 2][:5]
+                )
+            ],
+        }
+        trains = [r.legs[0] for r in routes if len(r.legs) == 1]
         choice = choose_train(trains, window, now + BOOKING_LEAD, flags.force_sold_out)
+        suitable = (
+            choice is not None and window.start <= choice.train.departs_at.time() <= window.end
+        )
+        transfers = [r for r in routes if len(r.legs) == 2]
+        if transfers and (not suitable or args.get("prefer_transfer") is True):
+            route = transfers[0]
+            choice = Choice(route.legs[0], None, route)
+            self._rail_source = "tago"
         if choice is None:
             self._enter(CallState.LISTENING)
-            spoken_day = speech.read_day(day, now.date())
             return {
+                **self._search_details,
+                "status": "api_error"
+                if result.api_failed
+                else "search_incomplete"
+                if not result.complete
+                else "no_route",
                 "need": "other_day",
-                "say": lines.NO_SEATS_THAT_DAY.format(day=spoken_day, arrival=arrival),
+                "say": "열차 정보 조회에 오류가 있어 경로를 확인하지 못했어요. 잠시 후 다시 찾아볼까요?"
+                if result.api_failed
+                else "일부 구간만 조회해서 경로를 아직 확인하지 못했어요. 다시 찾아볼까요?"
+                if not result.complete
+                else "해당 조건에 맞는 직통 또는 한 번 환승하는 경로를 찾지 못했어요. 다른 시간으로 찾아볼까요?",
             }
 
-        needs_senior = self._senior is None and fares.senior_discount_applies(choice.train)
+        legs = choice.itinerary.legs if choice.itinerary else (choice.train,)
+        needs_senior = self._senior is None and any(fares.senior_discount_applies(t) for t in legs)
         if needs_senior and not self._senior_asked:
             self._senior_asked = True
             self._pending_choice = (choice, party)
@@ -426,11 +484,32 @@ class CallSession:
         current = self._current
         assert current is not None
         train = current.train
+        if current.itinerary and len(current.itinerary.legs) == 2:
+            return await self._find_trains(
+                {
+                    "departure": train.dep,
+                    "arrival": current.itinerary.legs[-1].arr,
+                    "relative_day": "date",
+                    "month": train.departs_at.month,
+                    "day_of_month": train.departs_at.day,
+                    "include_transfers": True,
+                    "prefer_transfer": True,
+                    "clock_time": train.departs_at.strftime("%H:%M"),
+                    "part_of_day": "any",
+                    "party": current.party,
+                    "route_direction": direction,
+                    "route_departure": train.departs_at.isoformat(),
+                }
+            )
         now = datetime.now(KST)
         self._enter(CallState.SEARCHING)
-        trains, self._rail_source = await self._deps.rail.search(
-            train.dep, train.arr, train.departs_at.date(), None, self._rail_mode, self.call_id
-        )
+        try:
+            trains, self._rail_source = await self._deps.rail.search(
+                train.dep, train.arr, train.departs_at.date(), None, self._rail_mode, self.call_id
+            )
+        except RailUnavailable:
+            self._enter(CallState.PROPOSED)
+            return {"status": "api_error", "say": "조회 오류로 다른 열차를 확인하지 못했어요."}
         nearby = adjacent_train(trains, train, direction, now + BOOKING_LEAD)
         if nearby is None:
             self._enter(CallState.PROPOSED)
@@ -446,42 +525,67 @@ class CallSession:
             self._pending_choice = None
             return self._propose(choice, party)
         if self._current is not None:
-            return self._propose(Choice(self._current.train, None), self._current.party)
+            return self._propose(
+                Choice(self._current.train, None, self._current.itinerary), self._current.party
+            )
         return {"say": lines.SENIOR_NOTED}
+
+    def _invalidate_proposal(self) -> None:
+        self._current = None
+        self._pending_choice = None
+        self._proposal_completed = False
+        self._expect_proposal = False
+        self._replies = []
+        self._judgement = None
 
     def _propose(self, choice: Choice, party: int) -> dict[str, Any]:
         now = datetime.now(KST)
         senior = bool(self._senior)
-        discounted = senior and fares.senior_discount_applies(choice.train)
+        route = choice.itinerary or Itinerary((choice.train,))
+        discounted = senior and any(fares.senior_discount_applies(t) for t in route.legs)
         proposal = Proposal(
             option_id=f"opt_{secrets.token_hex(3)}",
             train=choice.train,
             party=party,
             senior=senior,
-            fare_total=fares.fare_total(choice.train, party, senior),
+            fare_total=sum(fares.fare_total(t, party, senior) for t in route.legs),
             sold_out_preferred=choice.sold_out_preferred,
             created_at=now,
+            itinerary=route,
         )
         self._options[proposal.option_id] = proposal
         self._current = proposal
         self._proposal_say = speech.proposal_sentence(proposal, now.date(), discounted)
-        self._proposal_short = speech.reconfirm_sentence(proposal.train)
+        if (
+            len(route.legs) > 1
+            and not self._search_details.get("direct_found")
+            and not self._search_details.get("api_failed")
+        ):
+            self._proposal_say = (
+                "직통 열차는 조회되지 않았지만 환승 경로가 있어요. " + self._proposal_say
+            )
+        self._proposal_short = (
+            self._proposal_say if len(route.legs) > 1 else speech.reconfirm_sentence(proposal.train)
+        )
         self._expect_proposal = True
         self._consent_misses = 0
         self._enter(CallState.PROPOSED)
         return {
+            **self._search_details,
+            "status": "transfer_found" if len(route.legs) > 1 else "direct_found",
             "option_id": proposal.option_id,
             "say": self._proposal_say,
             "say_short": self._proposal_short,
             "facts": speech.proposal_facts(proposal, now.date(), discounted),
             "train": {
                 **train_to_dict(proposal.train),
-                "fareTotal": proposal.fare_total,
+                "fareTotal": proposal.fare_total if route.fare is not None else None,
                 "soldOutPreferred": (
                     train_to_dict(choice.sold_out_preferred) if choice.sold_out_preferred else None
                 ),
             },
             "source": self._rail_source,
+            "itinerary": itinerary_to_dict(route),
         }
 
     async def _request_booking(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -570,6 +674,11 @@ class CallSession:
         return result
 
     async def _secure(self, proposal: Proposal) -> Secured:
+        if proposal.itinerary and proposal.itinerary.fare is None:
+            self._enter(CallState.LISTENING)
+            return Secured(
+                False, "일부 구간의 운임을 확인하지 못해서 모의 예약을 진행할 수 없어요."
+            )
         request = HoldRequest(
             call_id=self.call_id,
             tester_id=self.tester.id,
@@ -579,7 +688,9 @@ class CallSession:
             fare_total=proposal.fare_total,
         )
         try:
-            hold = await self._deps.rail.hold(request, self._rail_mode)
+            hold = await self._deps.rail.hold_route(
+                request, proposal.itinerary or Itinerary((proposal.train,)), self._rail_mode
+            )
         except HoldFailed as error:
             self._log("hold_failed", reason=error.reason)
             self._enter(CallState.LISTENING)
@@ -595,7 +706,7 @@ class CallSession:
             id=f"bk_{self.call_id}",
             call_id=self.call_id,
             tester_id=self.tester.id,
-            train_key=hold.train.key,
+            train_key=hold.itinerary.key if hold.itinerary else hold.train.key,
             pnr=hold.pnr,
             provider=hold.provider,
             status="held",
@@ -604,6 +715,8 @@ class CallSession:
                 "train": train_to_dict(hold.train),
                 "fareTotal": hold.fare_total,
                 "seat": hold.seat,
+                "itinerary": itinerary_to_dict(hold.itinerary) if hold.itinerary else None,
+                "legHolds": [hold_to_dict(leg) for leg in hold.leg_holds],
             },
         )
         await self._deps.store.save_booking(self._booking)
@@ -613,6 +726,8 @@ class CallSession:
             "fareTotal": hold.fare_total,
             "seat": hold.seat,
             "train": train_to_dict(hold.train),
+            "itinerary": itinerary_to_dict(hold.itinerary) if hold.itinerary else None,
+            "legHolds": [{**hold_to_dict(leg), "pnr": mask_pnr(leg.pnr)} for leg in hold.leg_holds],
         }
         self._log("hold", **summary)
         self._write(self._deps.store.update_call(self.call_id, {"booking": summary}))
@@ -623,7 +738,11 @@ class CallSession:
             tester_id=self.tester.id,
             payer=self.tester.alias,
             amount=hold.fare_total,
-            item=f"{train.dep}→{train.arr} {train.grade} {train.departs_at:%H:%M}",
+            item=(
+                f"{train.dep}→{hold.itinerary.legs[-1].arr} 환승 1회 · 구간별 모의 예약"
+                if hold.itinerary
+                else f"{train.dep}→{train.arr} {train.grade} {train.departs_at:%H:%M}"
+            ),
         )
         self._payment_id = payment.id
         self._enter(CallState.PAYMENT_PENDING)
@@ -641,7 +760,15 @@ class CallSession:
         )
         self._log("payment", status="requested", amount=payment.amount)
         self._spawn(self._await_payment(hold, payment))
-        return Secured(ok=True, say=lines.PAY_PROMPT)
+        return Secured(
+            ok=True,
+            say=(
+                "두 구간의 모의 예약을 준비했어요. 실제 좌석을 확보한 것은 아니에요. "
+                + lines.PAY_PROMPT
+            )
+            if hold.itinerary
+            else lines.PAY_PROMPT,
+        )
 
     async def _announce_when_secured(self, securing: asyncio.Task[Secured]) -> None:
         waited = 0.0
@@ -741,6 +868,13 @@ class CallSession:
         self._log("cancel", reason=reason, provider=self._hold.provider)
 
     async def _send_train_info(self, proposal: Proposal) -> None:
+        if proposal.itinerary and len(proposal.itinerary.legs) > 1:
+            await self._deliver(
+                "[여기로] 환승 열차 안내\n"
+                + speech.route_description(proposal.itinerary)
+                + "\n예약되지 않았습니다. 좌석 재고는 미확인입니다."
+            )
+            return
         train = proposal.train
         body = "\n".join(
             [
