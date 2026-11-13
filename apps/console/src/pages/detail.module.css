@@ -14,10 +14,55 @@
   color: var(--ink);
 }
 
+.headRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .headChips {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.deleteLink {
+  border: 0;
+  background: none;
+  padding: 8px 4px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.deleteLink:hover {
+  color: var(--danger);
+}
+
+.confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.confirm span {
+  margin-right: 4px;
+}
+
+.confirm button {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.confirm button:disabled {
+  opacity: 0.6;
 }
 
 .segment {
