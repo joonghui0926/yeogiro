@@ -81,5 +81,89 @@
     "rail": "live",
     "turns": ["내일 아침에 강릉 가려고", "어디서 갈아타요?", "그럼 그걸로 해 줘"],
     "expect": { "outcome": "booked", "max_reasks": 1 }
+  },
+  {
+    "id": 11,
+    "name": "묻기 전에 안 감",
+    "why": "목적지도 말하기 전에 그만둠. 되묻지 않고 정리한 뒤 마무리",
+    "tester": { "home": "대전", "senior": false },
+    "turns": ["기차 예약하려고 했는데", "아니다, 그냥 안 갈래", "없어요"],
+    "expect": { "tools": ["drop_trip"], "no_tools": ["request_booking"], "last_ai": "네, 감사합니다." }
+  },
+  {
+    "id": 12,
+    "name": "제안 듣고 안 감",
+    "why": "제안을 듣고 여행 자체를 그만둠. 다른 시간을 되묻지 않음",
+    "tester": { "home": "대전", "senior": false },
+    "turns": ["내일 아침에 부산 가요", "근데 갑자기 가기 싫어졌어", "아니 없어"],
+    "expect": { "outcome": "declined", "tools": ["drop_trip"], "after": { "tool": "drop_trip", "never_say": ["다른 시간"] }, "last_ai": "네, 감사합니다." }
+  },
+  {
+    "id": 13,
+    "name": "결제 기다리다 안 감",
+    "why": "자리를 잡고 결제를 기다리는 중에 그만둠. 자리와 결제를 풀고 결제 안내를 멈춤",
+    "tester": { "home": "대전", "senior": false },
+    "pay": false,
+    "turns": ["내일 아침에 부산 가요", "네, 해 주세요", { "wait": 4 }, "아이고 미안한데 안 갈래", "아니요, 없어요"],
+    "expect": { "outcome": "cancelled", "tools": ["drop_trip"], "after": { "tool": "drop_trip", "never_say": ["노란", "결제 버튼"] }, "last_ai": "네, 감사합니다." }
+  },
+  {
+    "id": 14,
+    "name": "결제 기다리다 예약 취소",
+    "why": "예약 취소를 부탁하면 자리를 풀고 그 뒤로 결제 안내가 나오지 않음",
+    "tester": { "home": "대전", "senior": false },
+    "pay": false,
+    "turns": ["내일 아침에 부산 가요", "네, 해 주세요", { "wait": 4 }, "예약 취소해 줘", "아니 없어"],
+    "expect": { "outcome": "cancelled", "after": { "tool": "cancel_booking", "never_say": ["노란", "결제 버튼"] } }
+  },
+  {
+    "id": 15,
+    "name": "안 간다더니 다른 곳",
+    "why": "그만뒀다가 다른 곳을 찾으면 처음처럼 돕고 원래 끝인사로 마무리",
+    "tester": { "home": "대전", "senior": false },
+    "turns": ["내일 아침에 부산 가요", "아 가기 싫어졌어", "그럼 동대구는 갈래", "네, 그걸로 해 줘", "없어요"],
+    "expect": { "outcome": "booked", "tools": ["drop_trip"], "last_ai": "조심히 다녀오세요." }
+  },
+  {
+    "id": 16,
+    "name": "역만 바꿈",
+    "why": "부산은 안 간다는 건 역을 바꾸는 말. 그만두는 게 아님",
+    "tester": { "home": "대전", "senior": false },
+    "turns": ["내일 아침에 부산 가요", "부산은 안 갈래, 동대구로 가 줘", "네, 해 주세요"],
+    "expect": { "outcome": "booked", "no_tools": ["drop_trip"] }
+  },
+  {
+    "id": 17,
+    "name": "시간만 바꿈",
+    "why": "아침 말고 오후는 시간을 바꾸는 말",
+    "tester": { "home": "대전", "senior": false },
+    "turns": ["내일 아침에 부산 가요", "아침 말고 오후에 갈래", "그걸로 해 줘"],
+    "expect": { "outcome": "booked", "no_tools": ["drop_trip"] }
+  },
+  {
+    "id": 18,
+    "name": "날짜만 바꿈",
+    "why": "내일 말고 모레는 날짜를 바꾸는 말",
+    "tester": { "home": "대전", "senior": false },
+    "turns": ["내일 아침에 부산 가요", "내일 말고 모레로 해 줘", "응, 그걸로"],
+    "expect": { "outcome": "booked", "no_tools": ["drop_trip"] }
+  },
+  {
+    "id": 19,
+    "name": "말이 안 끝남",
+    "why": "아 근데… 하고 멈추면 그만두는 걸로 보지 않고 끝까지 들음",
+    "tester": { "home": "대전", "senior": false },
+    "turns": ["내일 아침에 부산 가요", "아 근데", { "wait": 2 }, "그냥 그걸로 해 줘"],
+    "expect": { "outcome": "booked", "no_tools": ["drop_trip"] }
+  },
+  {
+    "id": 20,
+    "name": "환승 결제 중 안 감",
+    "why": "두 구간을 잡은 환승 예약도 그만두면 두 자리 모두 풀림",
+    "tester": { "home": "대전", "senior": false },
+    "rail": "live",
+    "pay": false,
+    "turns": ["내일 아침에 강릉 가려고", "네, 그걸로 해 줘", { "wait": 4 }, "아이고 그냥 안 갈래", "없어"],
+    "expect": { "outcome": "cancelled", "tools": ["drop_trip"], "after": { "tool": "drop_trip", "never_say": ["노란", "결제 버튼"] } }
   }
 ]
