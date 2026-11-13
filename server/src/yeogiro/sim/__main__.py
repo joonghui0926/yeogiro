@@ -10,6 +10,7 @@ import argparse
 import asyncio
 import json
 import time
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -18,8 +19,11 @@ import httpx
 from yeogiro.adapters.messaging.inbox import InAppMessenger
 from yeogiro.adapters.openai.consent_judge import OpenAIConsentJudge
 from yeogiro.adapters.payment.mock_onetouch import MockOneTouch
+from yeogiro.adapters.rail.itineraries import TransferPolicy
+from yeogiro.adapters.rail.korail_runs import KorailRuns
 from yeogiro.adapters.rail.mock import MockRail
 from yeogiro.adapters.rail.router import RailRouter
+from yeogiro.adapters.rail.tago import TagoTimetable
 from yeogiro.adapters.store.memory import MemoryStore
 from yeogiro.calls.session import CallDeps, CallSession, CallState
 from yeogiro.calls.voice_session import realtime_session
@@ -30,6 +34,25 @@ from yeogiro.sim.line import TextVoice
 CARDS = Path(__file__).resolve().parents[3] / "scenarios" / "cards.json"
 QUIET_HOLD_SECONDS = 1.2
 TURN_TIMEOUT_SECONDS = 45.0
+
+
+def _rail(card: dict[str, Any], settings: Settings, http: httpx.AsyncClient) -> RailRouter:
+    """Cards about real routes (no direct train, transfers) search TAGO and Korail's timetable."""
+    mock = MockRail()
+    if card.get("rail") != "live" or not settings.tago_service_key:
+        return RailRouter(mock, mock, None, None)
+    runs = KorailRuns(
+        settings.tago_service_key, http, timedelta(minutes=settings.transfer_min_minutes)
+    )
+    return RailRouter(
+        TagoTimetable(settings.tago_service_key, http),
+        mock,
+        None,
+        None,
+        TransferPolicy(min_minutes=settings.transfer_min_minutes),
+        runs.hubs,
+        sample_on_failure=True,
+    )
 
 
 async def play(card: dict[str, Any], settings: Settings, http: httpx.AsyncClient) -> dict[str, Any]:
@@ -44,10 +67,9 @@ async def play(card: dict[str, Any], settings: Settings, http: httpx.AsyncClient
     flags = Flags(rail_mode=RailMode.MOCK, force_sold_out=card.get("sold_out", False))
     store = MemoryStore(testers={"sim": tester}, flags=flags)
     voice = TextVoice(settings.openai_api_key, realtime_session(settings, tester))
-    mock = MockRail()
     deps = CallDeps(
         voice=voice,
-        rail=RailRouter(mock, mock, None, None),
+        rail=_rail(card, settings, http),
         judge=OpenAIConsentJudge(settings.openai_api_key, settings.judge_model, http),
         payments=MockOneTouch(store),
         messenger=InAppMessenger(store),

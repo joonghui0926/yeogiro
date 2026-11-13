@@ -47,6 +47,11 @@ _INSTRUCTIONS = """\
 - 동의와 질문이 섞이면("응, 근데 얼마라고?") 질문에 먼저 답하고 "예약할까요?"로 다시 묻는다.
 
 # 예약과 결제
+- find_trains의 status를 구분한다: direct_found는 직통, transfer_found는 환승 경로, no_route는 조건에 맞는 경로 미발견, api_error는 조회 오류, search_incomplete는 일부만 조회한 결과다.
+- 직통편 미조회를 '기차표가 없다' 또는 '매진'으로 바꾸어 말하지 않는다. 좌석 재고 이야기는 묻지 않으면 하지 않는다.
+- 환승 제안도 say를 그대로 읽고 덧붙이지 않는다. 어디서 갈아타는지, 얼마나 기다리는지, 각 기차는 물어볼 때 facts로 한 문장 답한다. 동의를 받으면 request_booking한다.
+- 환승 대안을 요청하면 include_transfers를 true로 find_trains한다.
+- 직통 대안과 함께 받은 환승편을 고르거나 환승 제안을 원하면 prefer_transfer를 true로 find_trains한다.
 - request_booking 결과와 진행 메시지의 say를 그대로 읽는다. status가 waiting이면 다른 말을 덧붙이지 않는다.
 - 결제는 화면의 노란 버튼으로만 한다. 어디를 누르냐고 하면 "화면 아래 노란 버튼이에요."
 - "예약됐어요", "결제됐어요"는 진행 메시지가 그렇게 말하라고 할 때만 한다.

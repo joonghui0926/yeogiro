@@ -1,4 +1,4 @@
-import type { CallDoc, CallEvent, RailJobDoc, TesterDoc } from '@yeogiro/contracts'
+import type { BookingSummary, CallDoc, CallEvent, RailJobDoc, TesterDoc } from '@yeogiro/contracts'
 import type { WithId } from './hooks'
 
 /** Synthetic data for screenshots, offline review, and a presentation fallback. ?demo=1 enables it. */
@@ -41,6 +41,7 @@ const ROWS: Row[] = [
   { id: 'd9', tester: '테스터 1', startMin: 360, dur: 46, outcome: 'booked', state: 'ended', status: 'ended', reasks: 0 },
   { id: 'd10', tester: '테스터 5', startMin: 420, dur: 38, outcome: 'booked', state: 'ended', status: 'ended', reasks: 1, source: 'korail' },
   { id: 'd11', tester: '테스터 2', startMin: 500, dur: 55, outcome: 'cancelled', state: 'ended', status: 'ended', reasks: 0 },
+  { id: 'transfer', tester: '환승 모의 테스트', startMin: 600, dur: 120, outcome: 'booked', state: 'ended', status: 'ended' },
 ]
 
 const TRAIN = {
@@ -52,6 +53,16 @@ const TRAIN = {
   arrivesAt: new Date(Date.now() + 4 * 86_400_000 + 64 * 60_000).toISOString(),
   fare: 23700,
   seatsAvailable: true,
+}
+
+const TRANSFER_LEGS = [
+  { ...TRAIN, dep: '대전', arr: '서울', departsAt: '2026-11-17T09:00:00+09:00', arrivesAt: '2026-11-17T10:00:00+09:00', fare: 23700, seatsAvailable: null },
+  { ...TRAIN, trainNo: '901', dep: '서울', arr: '강릉', departsAt: '2026-11-17T10:30:00+09:00', arrivesAt: '2026-11-17T12:30:00+09:00', fare: 27600, seatsAvailable: null },
+]
+const TRANSFER_BOOKING: BookingSummary = {
+  provider: 'mock', pnr: '구간별 별도 예약', fareTotal: 51300, seat: null, train: TRANSFER_LEGS[0],
+  itinerary: { kind: 'transfer', legs: TRANSFER_LEGS, transferCount: 1, transferStation: '서울', waitMinutes: 30, durationMinutes: 210, fare: 51300, seatAvailability: 'unknown' },
+  legHolds: TRANSFER_LEGS.map((train, index) => ({ provider: 'mock', pnr: `MOCK-${index + 1}`, fareTotal: train.fare, seat: '모의 3호차 7A', train })),
 }
 
 export const demoCalls: WithId<CallDoc>[] = ROWS.map((r) => ({
@@ -74,13 +85,22 @@ export const demoCalls: WithId<CallDoc>[] = ROWS.map((r) => ({
   gateFailures: r.gateFailures ?? 0,
   railSource: r.source ?? 'tago',
   booking:
-    r.outcome === 'booked'
+    r.id === 'transfer' ? TRANSFER_BOOKING : r.outcome === 'booked'
       ? { provider: (r.source === 'korail' ? 'korail' : 'mock') as 'korail' | 'mock', pnr: '7429••••03', fareTotal: 16500, seat: '3호차 7A', train: TRAIN }
       : undefined,
   lastGate: r.outcome === 'no_consent' ? { passed: false, verdict: 'unclear' } : undefined,
 }))
 
 export function demoEvents(callId: string): WithId<CallEvent>[] {
+  if (callId === 'transfer') return [
+    ev('t1', 1000, { kind: 'user', text: '대전에서 강릉까지 환승으로 찾아 주세요.' }),
+    ev('t1a', 1500, { kind: 'tool_call', name: 'find_trains', args: { departure: '대전', arrival: '강릉', prefer_transfer: true } }),
+    ev('t2', 2000, { kind: 'tool_result', name: 'find_trains', ms: 100, result: { status: 'transfer_found', train: TRANSFER_LEGS[0], itinerary: TRANSFER_BOOKING.itinerary, say: '화면 검토용 가상 시간표입니다. 서울역에서 한 번 갈아타며 대기시간은 삼십 분이에요. 첫 열차는 오전 아홉 시 대전 출발, 열 시 서울 도착. 두 번째 열차는 열 시 삼십 분 서울 출발, 오후 열두 시 삼십 분 강릉 도착이에요. 예상 합계 오만 천삼백 원이며 좌석은 미확인이에요. 두 구간을 별도로 모의 예약할까요?' } }),
+    ev('t3', 65000, { kind: 'user', text: '네, 두 구간 모두 모의 예약해 주세요.' }),
+    ev('t3a', 65500, { kind: 'gate', passed: true, verdict: 'yes', reason: '화면 검토용 모의 동의 결과: 두 구간 전체에 동의', replies: ['네, 두 구간 모두 모의 예약해 주세요.'], checks: [{ code: 'heard', label: '전체 여정을 끝까지 들음', passed: true }, { code: 'consent', label: '전체 여정에 명확한 동의', passed: true }] }),
+    ev('t4', 66000, { kind: 'hold', ...TRANSFER_BOOKING }),
+    ev('t5', 67000, { kind: 'payment', status: 'approved', amount: 51300 }),
+  ]
   if (callId !== 'd4') return baseEvents()
   return baseEvents()
 }

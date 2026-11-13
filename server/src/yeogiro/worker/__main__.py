@@ -7,7 +7,7 @@ import os
 from datetime import date, datetime, time
 from typing import Any
 
-from google.cloud import firestore
+from google.cloud import firestore_v1 as firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 from yeogiro.adapters.rail.codec import (
@@ -133,6 +133,8 @@ def main() -> None:
     parser.add_argument("--check", action="store_true", help="log in and search once, then exit")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    # httpx logs each request URL at INFO, and public-data URLs carry the service key.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
     settings = load_settings()
     member_id, password = os.environ.get("KORAIL_ID"), os.environ.get("KORAIL_PW")

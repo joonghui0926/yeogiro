@@ -12,6 +12,14 @@ FIND_TRAINS: dict[str, Any] = {
     "parameters": {
         "type": "object",
         "properties": {
+            "prefer_transfer": {
+                "type": "boolean",
+                "description": "사용자가 환승 경로를 선택하거나 환승편 제안을 원하면 true",
+            },
+            "include_transfers": {
+                "type": "boolean",
+                "description": "직통편이 있어도 환승 대안을 함께 찾을 때 true",
+            },
             "arrival": {"type": "string", "enum": list(STATIONS), "description": "도착역"},
             "departure": {
                 "type": "string",

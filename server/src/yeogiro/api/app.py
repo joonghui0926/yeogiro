@@ -27,6 +27,8 @@ from yeogiro.runtime import Runtime, build_runtime
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logging.getLogger("yeogiro").setLevel(os.environ.get("LOG_LEVEL", "INFO"))
+# httpx logs each request URL at INFO, and public-data URLs carry the service key.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 log = logging.getLogger("yeogiro.api")
 
 HEARTBEAT_SECONDS = 15
@@ -37,10 +39,18 @@ SESSION_LINGER_SECONDS = 60
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     runtime = build_runtime(load_settings())
     app.state.runtime = runtime
+    warming = asyncio.create_task(runtime.warm())
+    warming.add_done_callback(_report_warm)
     yield
+    warming.cancel()
     for session in runtime.registry.live():
         await session.hangup("shutdown")
     await runtime.close()
+
+
+def _report_warm(task: asyncio.Task[None]) -> None:
+    if not task.cancelled() and task.exception() is not None:
+        log.warning("timetable warm-up failed: %s", task.exception())
 
 
 app = FastAPI(title="여기로 call server", lifespan=lifespan)
