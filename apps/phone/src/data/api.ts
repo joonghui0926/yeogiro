@@ -49,13 +49,21 @@ export const api = {
   createCall: (token: string, sdp: string) =>
     post<{ callId: string; sdp: string; phoneBand: boolean }>('/api/calls', { token, sdp, device: deviceId() }),
   connected: (token: string, callId: string, client: ClientReport) =>
-    post<{ ok: boolean }>(`/api/calls/${callId}/connected`, { token, client }, OTHER_INSTANCE_RETRIES),
+    post<{ ok: boolean }>(
+      `/api/calls/${callId}/connected`,
+      { token, client, device: deviceId() },
+      OTHER_INSTANCE_RETRIES,
+    ),
   hangup: (token: string, callId: string) =>
-    post<{ ok: boolean }>(`/api/calls/${callId}/hangup`, { token }, OTHER_INSTANCE_RETRIES),
+    post<{ ok: boolean }>(`/api/calls/${callId}/hangup`, { token, device: deviceId() }, OTHER_INSTANCE_RETRIES),
   approvePayment: (token: string, paymentId: string) =>
-    post<{ ok: boolean }>(`/api/payments/${paymentId}/approve`, { token }, OTHER_INSTANCE_RETRIES),
+    post<{ ok: boolean }>(
+      `/api/payments/${paymentId}/approve`,
+      { token, device: deviceId() },
+      OTHER_INSTANCE_RETRIES,
+    ),
   events: (token: string, callId: string, onEvent: (event: PhoneEvent) => void): { close: () => void } => {
-    const url = `${BASE}/api/calls/${callId}/events?token=${encodeURIComponent(token)}`
+    const url = `${BASE}/api/calls/${callId}/events?token=${encodeURIComponent(token)}&device=${deviceId()}`
     let source: EventSource | null = null
     let retries = OTHER_INSTANCE_RETRIES
     let closed = false

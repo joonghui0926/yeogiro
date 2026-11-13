@@ -211,6 +211,8 @@ def proposal_facts(proposal: Proposal, today: date, senior_discounted: bool) -> 
 
 
 def reconfirm_route(route: Itinerary, by_arrival: bool = False) -> str:
+    if route.fare is None:
+        return "요금을 확인하지 못해서 지금은 예약할 수 없어요. 다른 시간으로 찾아볼까요?"
     if len(route.legs) == 1:
         return reconfirm_sentence(route.legs[0], by_arrival)
     last = route.legs[-1]

@@ -77,6 +77,7 @@ def _device(value: str | None) -> str | None:
 
 class TokenBody(BaseModel):
     token: str
+    device: str | None = None
 
 
 class ConnectedBody(TokenBody):
@@ -95,9 +96,14 @@ async def _tester(runtime: Runtime, token: str) -> Tester:
     return tester
 
 
-def _session(runtime: Runtime, call_id: str, tester: Tester) -> CallSession:
+def _session(
+    runtime: Runtime, call_id: str, tester: Tester, device: str | None = None
+) -> CallSession:
     session = runtime.registry.get(call_id)
     if session is None or session.tester.id != tester.id:
+        raise HTTPException(status_code=404, detail="no such call")
+    if session.device and _device(device) != session.device:
+        # Several people share the demo link; only the phone that made the call may act on it.
         raise HTTPException(status_code=404, detail="no such call")
     return session
 
@@ -164,7 +170,7 @@ async def create_call(body: CreateCall, request: Request) -> dict[str, Any]:
 @app.post("/api/calls/{call_id}/connected")
 async def connected(call_id: str, body: ConnectedBody, request: Request) -> dict[str, bool]:
     runtime = _runtime(request)
-    session = _session(runtime, call_id, await _tester(runtime, body.token))
+    session = _session(runtime, call_id, await _tester(runtime, body.token), body.device)
     await session.on_media_connected(body.client)
     return {"ok": True}
 
@@ -172,29 +178,35 @@ async def connected(call_id: str, body: ConnectedBody, request: Request) -> dict
 @app.post("/api/calls/{call_id}/hangup")
 async def hangup(call_id: str, body: TokenBody, request: Request) -> dict[str, bool]:
     runtime = _runtime(request)
-    session = _session(runtime, call_id, await _tester(runtime, body.token))
+    session = _session(runtime, call_id, await _tester(runtime, body.token), body.device)
     await session.hangup("caller")
     return {"ok": True}
 
 
 @app.get("/api/calls/{call_id}/events")
-async def events(call_id: str, token: str, request: Request) -> StreamingResponse:
+async def events(
+    call_id: str, token: str, request: Request, device: str | None = None
+) -> StreamingResponse:
     runtime = _runtime(request)
-    session = _session(runtime, call_id, await _tester(runtime, token))
+    session = _session(runtime, call_id, await _tester(runtime, token), device)
+    queue = session.subscribe()
 
     async def stream() -> AsyncIterator[str]:
-        yield ": connected\n\n"
-        while True:
-            if await request.is_disconnected():
-                return
-            try:
-                event = await asyncio.wait_for(session.outbound.get(), HEARTBEAT_SECONDS)
-            except TimeoutError:
-                yield ": ping\n\n"
-                continue
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-            if event.get("type") == "call.ended":
-                return
+        try:
+            yield ": connected\n\n"
+            while True:
+                if await request.is_disconnected():
+                    return
+                try:
+                    event = await asyncio.wait_for(queue.get(), HEARTBEAT_SECONDS)
+                except TimeoutError:
+                    yield ": ping\n\n"
+                    continue
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                if event.get("type") == "call.ended":
+                    return
+        finally:
+            session.unsubscribe(queue)
 
     return StreamingResponse(
         stream(),
@@ -208,6 +220,8 @@ async def approve_payment(payment_id: str, body: TokenBody, request: Request) ->
     runtime = _runtime(request)
     tester = await _tester(runtime, body.token)
     session = runtime.registry.awaiting(tester.id, payment_id)
+    if session is not None and session.device and _device(body.device) != session.device:
+        session = None
     if session is None or not await session.approve_payment(payment_id):
         raise HTTPException(status_code=409, detail="payment is not pending")
     return {"ok": True}

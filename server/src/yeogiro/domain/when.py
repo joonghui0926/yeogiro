@@ -106,6 +106,14 @@ def resolve_window(
 
     arrives = _parse_clock(arrival_clock, part)
     departs = _parse_clock(clock, part)
+    # "아침에 나가서 두 시까지" arrives in the afternoon, not before the morning train leaves.
+    if (
+        arrives is not None
+        and arrives.hour < 12
+        and part is not PartOfDay.DAWN
+        and ((departs is not None and arrives <= departs) or 1 <= arrives.hour <= 6)
+    ):
+        arrives = time(arrives.hour + 12, arrives.minute)
     if arrives is not None:
         asked, anchor = arrives, "arrives"
         start = _shift(arrives, -ARRIVAL_LOOKBACK_MINUTES)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 import httpx
@@ -34,6 +34,16 @@ class Runtime:
     deps: CallDeps
     registry: CallRegistry
     runs: KorailRuns | None = None
+    calls_by_day: dict[str, int] = field(default_factory=dict)
+
+    def take_call(self) -> bool:
+        """Count a new call against the daily limit that caps voice spending."""
+        today = datetime.now(KST).strftime("%Y-%m-%d")
+        used = self.calls_by_day.get(today, 0)
+        if used >= self.settings.daily_call_limit:
+            return False
+        self.calls_by_day = {today: used + 1}
+        return True
 
     async def warm(self) -> None:
         if self.runs is not None:
