@@ -48,6 +48,7 @@ TAIL_OVERLAP_MS = 1500
 QUICK_HOLD_SECONDS = 2.5
 WAIT_FILLER_FIRST_SECONDS = 4.0
 WAIT_FILLER_EVERY_SECONDS = 8.0
+SEARCH_FILLER_SECONDS = 4.0
 PAYMENT_REMINDERS = ((15.0, lines.PAY_REMINDER), (35.0, lines.PAY_REMINDER_LAST))
 PAYMENT_GIVE_UP_SECONDS = 60.0
 TRANSCRIPT_GRACE_SECONDS = 2.5
@@ -175,7 +176,11 @@ class CallSession:
         self._rail_source = ""
         self._trip_dropped = False
         self._search_details: dict[str, Any] = {}
-        self._ticket_sent = False
+        self._tickets_sent: set[str] = set()
+        self._bookings_made = 0
+        self._proposal_spoken = ""
+        self._pending_payment: dict[str, Any] | None = None
+        self._listeners: list[asyncio.Queue[dict[str, Any]]] = []
 
         self._tools: dict[str, ToolHandler] = {
             "find_trains": self._find_trains,
@@ -242,7 +247,14 @@ class CallSession:
     async def approve_payment(self, payment_id: str) -> bool:
         if payment_id != self._payment_id:
             return False
-        return await self._deps.payments.approve(payment_id)
+        approved = await self._deps.payments.approve(payment_id)
+        if approved and self._booking is not None and self._booking.status == "held":
+            # A hangup before the payment loop notices must not release a seat that was paid for.
+            self._booking.status = "paid"
+            self._outcome = "booked"
+            self._pending_payment = None
+            await self._deps.store.save_booking(self._booking)
+        return approved
 
     async def hangup(self, by: str) -> None:
         if self.closed:
@@ -255,6 +267,12 @@ class CallSession:
             # A caller who hangs up right after paying still gets the ticket.
             with contextlib.suppress(Exception):
                 await self._send_ticket(self._hold)
+            if self._hold.provider in ("korail", "assist"):
+                with contextlib.suppress(Exception):
+                    await self._deps.rail.cancel(self._hold, self.call_id)
+                self._booking.extra["realHoldReleased"] = True
+                with contextlib.suppress(Exception):
+                    await self._deps.store.save_booking(self._booking)
         self._emit({"type": "call.ended", "by": by})
         if self._payment_id:
             await self._deps.payments.expire(self._payment_id)
@@ -314,6 +332,7 @@ class CallSession:
                 self._proposal_started = now
                 self._proposal_completed = False
                 self._proposal_cut_at_ms = None
+                self._proposal_spoken = ""
                 self._replies = []
                 self._judgement = None
 
@@ -329,6 +348,8 @@ class CallSession:
             text = str(event.get("transcript") or event.get("text") or "").strip()
             if text:
                 self._last_ai_text = text
+                if event.get("response_id") == self._proposal_response:
+                    self._proposal_spoken = text
                 self._log("ai", text=text)
                 if self._is_reask(text):
                     self._reasks += 1
@@ -427,17 +448,23 @@ class CallSession:
         self._invalidate_proposal()
         self._enter(CallState.SEARCHING)
         flags = await self._deps.store.flags()
-        result = await self._deps.rail.search_routes(
-            departure,
-            arrival,
-            window,
-            now + BOOKING_LEAD,
-            self._rail_mode,
-            self.call_id,
-            include_transfers=args.get("include_transfers") is True
-            or args.get("prefer_transfer") is True,
-            force_sold_out=flags.force_sold_out,
+        searching = asyncio.ensure_future(
+            self._deps.rail.search_routes(
+                departure,
+                arrival,
+                window,
+                now + BOOKING_LEAD,
+                self._rail_mode,
+                self.call_id,
+                include_transfers=args.get("include_transfers") is True
+                or args.get("prefer_transfer") is True,
+                force_sold_out=flags.force_sold_out,
+            )
         )
+        done, _ = await asyncio.wait({searching}, timeout=SEARCH_FILLER_SECONDS)
+        if not done:
+            self._spawn(self._say(lines.SEARCH_STILL))
+        result = await searching
         self._rail_source = result.source
         routes = list(result.routes)
         route_direction = args.get("route_direction")
@@ -520,7 +547,7 @@ class CallSession:
         assert current is not None
         train = current.train
         if current.itinerary and len(current.itinerary.legs) == 2:
-            return await self._find_trains(
+            found = await self._find_trains(
                 {
                     "departure": train.dep,
                     "arrival": current.itinerary.legs[-1].arr,
@@ -530,12 +557,17 @@ class CallSession:
                     "include_transfers": True,
                     "prefer_transfer": True,
                     "clock_time": train.departs_at.strftime("%H:%M"),
-                    "part_of_day": "any",
+                    "part_of_day": _part_of(train.departs_at),
                     "party": current.party,
                     "route_direction": direction,
                     "route_departure": train.departs_at.isoformat(),
                 }
             )
+            if found.get("option_id"):
+                return found
+            side = "앞" if direction == "earlier" else "뒤"
+            kept = self._propose(Choice(train, None, current.itinerary), current.party)
+            return {**kept, "status": "keep_current", "say": lines.NO_ADJACENT.format(side=side)}
         now = datetime.now(KST)
         self._enter(CallState.SEARCHING)
         try:
@@ -625,6 +657,10 @@ class CallSession:
         }
 
     async def _request_booking(self, args: dict[str, Any]) -> dict[str, Any] | None:
+        if self.state is CallState.HOLDING:
+            return {"ok": False, "reason": "busy", "say": lines.HOLDING_STILL}
+        if self.state is CallState.PAYMENT_PENDING:
+            return {"ok": False, "reason": "busy", "say": lines.PAY_PROMPT}
         option_id = str(args.get("option_id", ""))
         proposal = self._options.get(option_id)
         now = datetime.now(KST)
@@ -672,11 +708,10 @@ class CallSession:
                 {"code": c.code, "label": c.label, "passed": c.passed} for c in decision.checks
             ],
         )
-        self._write(
-            self._deps.store.update_call(
-                self.call_id, {"lastGate": {"passed": decision.passed, "verdict": verdict.value}}
-            )
-        )
+        gate: dict[str, Any] = {"lastGate": {"passed": decision.passed, "verdict": verdict.value}}
+        if decision.passed:
+            gate["gatePassed"] = True
+        self._write(self._deps.store.update_call(self.call_id, gate))
         if not decision.passed or proposal is None:
             self._gate_failures += 1
             return self._refusal(decision, proposal)
@@ -712,11 +747,11 @@ class CallSession:
         return result
 
     async def _secure(self, proposal: Proposal) -> Secured:
+        if self.closed:
+            return Secured(ok=False, say="")
         if proposal.itinerary and proposal.itinerary.fare is None:
             self._enter(CallState.LISTENING)
-            return Secured(
-                False, "일부 구간의 운임을 확인하지 못해서 모의 예약을 진행할 수 없어요."
-            )
+            return Secured(False, lines.FARE_UNKNOWN)
         request = HoldRequest(
             call_id=self.call_id,
             tester_id=self.tester.id,
@@ -740,8 +775,10 @@ class CallSession:
             return Secured(ok=False, say=lines.RAIL_DOWN)
 
         self._hold = hold
+        self._bookings_made += 1
+        suffix = "" if self._bookings_made == 1 else f"_{self._bookings_made}"
         self._booking = BookingRecord(
-            id=f"bk_{self.call_id}",
+            id=f"bk_{self.call_id}{suffix}",
             call_id=self.call_id,
             tester_id=self.tester.id,
             train_key=hold.itinerary.key if hold.itinerary else hold.train.key,
@@ -774,6 +811,10 @@ class CallSession:
             await self._release_hold("caller_dropped_trip")
             self._outcome = "cancelled"
             return Secured(ok=False, say="")
+        if self.closed:
+            # The caller hung up while the seat was being secured, so nobody is left to pay for it.
+            await self._release_hold("call_ended")
+            return Secured(ok=False, say="")
 
         train = hold.train
         payment = await self._deps.payments.request(
@@ -789,18 +830,17 @@ class CallSession:
         )
         self._payment_id = payment.id
         self._enter(CallState.PAYMENT_PENDING)
-        self._emit(
-            {
-                "type": "payment.requested",
-                "payment": {
-                    "id": payment.id,
-                    "amount": payment.amount,
-                    "merchant": payment.merchant,
-                    "item": payment.item,
-                    "payer": payment.payer,
-                },
-            }
-        )
+        self._pending_payment = {
+            "type": "payment.requested",
+            "payment": {
+                "id": payment.id,
+                "amount": payment.amount,
+                "merchant": payment.merchant,
+                "item": payment.item,
+                "payer": payment.payer,
+            },
+        }
+        self._emit(self._pending_payment)
         self._log("payment", status="requested", amount=payment.amount)
         self._spawn(self._await_payment(hold, payment))
         return Secured(ok=True, say=lines.PAY_PROMPT)
@@ -829,6 +869,7 @@ class CallSession:
             await self._say(reminder)
         if not approved and not self._payment_gone(payment):
             approved = await self._deps.payments.wait(payment.id, PAYMENT_GIVE_UP_SECONDS - waited)
+        self._pending_payment = None
         if self._payment_gone(payment):
             return
         if not approved:
@@ -852,9 +893,9 @@ class CallSession:
         await self._send_ticket(hold)
 
     async def _send_ticket(self, hold: Hold) -> None:
-        if self._ticket_sent:
+        if hold.pnr in self._tickets_sent:
             return
-        self._ticket_sent = True
+        self._tickets_sent.add(hold.pnr)
         await self._deliver(
             speech.ticket_message(hold, self._current.party if self._current else 1)
         )
@@ -1065,7 +1106,8 @@ class CallSession:
             return False
         if self._proposal_cut_at_ms is None:
             return True
-        syllables = len(self._proposal_say.replace(" ", ""))
+        spoken = self._proposal_spoken or self._proposal_say
+        syllables = len(spoken.replace(" ", ""))
         spoken_ms = syllables / SPOKEN_SYLLABLES_PER_SECOND * 1000
         return self._proposal_cut_at_ms >= spoken_ms - TAIL_OVERLAP_MS
 
@@ -1107,6 +1149,20 @@ class CallSession:
 
     def _emit(self, event: dict[str, Any]) -> None:
         self.outbound.put_nowait(event)
+        for listener in self._listeners:
+            listener.put_nowait(event)
+
+    def subscribe(self) -> asyncio.Queue[dict[str, Any]]:
+        """Events for one phone connection; a payment still waiting is sent again first."""
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        if self._pending_payment is not None and self.state is CallState.PAYMENT_PENDING:
+            queue.put_nowait(self._pending_payment)
+        self._listeners.append(queue)
+        return queue
+
+    def unsubscribe(self, queue: asyncio.Queue[dict[str, Any]]) -> None:
+        with contextlib.suppress(ValueError):
+            self._listeners.remove(queue)
 
     def _log(self, kind: str, **data: Any) -> None:
         self._seq += 1
@@ -1139,6 +1195,21 @@ class CallSession:
 
 def _rank(state: CallState) -> int:
     return _PROGRESS.index(state) if state in _PROGRESS else -1
+
+
+def _part_of(moment: datetime) -> str:
+    hour = moment.hour
+    if hour < 6:
+        return "dawn"
+    if hour < 11:
+        return "morning"
+    if hour < 14:
+        return "noon"
+    if hour < 18:
+        return "afternoon"
+    if hour < 21:
+        return "evening"
+    return "night"
 
 
 def _int(value: Any) -> int | None:

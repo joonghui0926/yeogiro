@@ -117,6 +117,12 @@ class TestAskedTime:
         assert choice.train.arrives_at.time() == time(14, 4)
         assert choice.by_arrival
 
+    def test_arrival_prefers_the_latest_train_that_still_makes_it(self) -> None:
+        # Real 대전→서울 case: a 무궁화 leaving 13:57 arrives 15:59, a KTX leaving 14:50 arrives 15:47.
+        trains = [train(13, 57, minutes=122), train(14, 50, minutes=57)]
+        choice = choose_train(trains, self.window(time(16), "arrives"), self.now)
+        assert choice is not None and choice.train.departs_at.time() == time(14, 50)
+
     def test_arrival_sold_out_keeps_the_same_rule(self) -> None:
         trains = [train(13, 50, seats=False), train(12, 0), train(13, 0), train(15, 0)]
         choice = choose_train(trains, self.window(time(15), "arrives"), self.now)

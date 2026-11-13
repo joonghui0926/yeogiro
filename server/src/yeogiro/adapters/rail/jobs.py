@@ -29,15 +29,20 @@ class JobQueue:
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout
         interval = 0.3 if handler == "worker" else 0.8
-        while loop.time() < deadline:
-            data = (await ref.get()).to_dict() or {}
-            status = data.get("status")
-            if status == "done":
-                result: dict[str, Any] = data.get("result") or {}
-                return result
-            if status == "failed":
-                raise JobFailed(str(data.get("error") or "failed"))
-            await asyncio.sleep(interval)
+        try:
+            while loop.time() < deadline:
+                data = (await ref.get()).to_dict() or {}
+                status = data.get("status")
+                if status == "done":
+                    result: dict[str, Any] = data.get("result") or {}
+                    return result
+                if status == "failed":
+                    raise JobFailed(str(data.get("error") or "failed"))
+                await asyncio.sleep(interval)
+        except asyncio.CancelledError:
+            # The call ended: take the job off the operator and worker queues.
+            await asyncio.shield(ref.update({"status": "expired"}))
+            raise
         await ref.update({"status": "expired"})
         raise RailUnavailable(f"{kind} job timed out after {timeout:.0f}s")
 

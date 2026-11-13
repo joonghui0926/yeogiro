@@ -54,6 +54,7 @@ export interface CallDoc {
   testerId: string
   testerLabel: string
   deviceId?: string | null
+  gatePassed?: boolean
   startedAt: FirestoreTimestamp
   endedAt?: FirestoreTimestamp
   status: 'live' | 'ended'

@@ -31,7 +31,7 @@ export function summarize(calls: WithId<CallDoc>[]): Summary {
     booked: booked.length,
     completionRate: ended.length ? booked.length / ended.length : null,
     avgReasks: average(booked.map((c) => c.reasks ?? 0)),
-    unconsented: ended.filter((c) => c.booking && c.lastGate && c.lastGate.verdict !== 'yes').length,
+    unconsented: ended.filter((c) => c.booking && !c.gatePassed).length,
     gateBlocks: ended.reduce((sum, c) => sum + (c.gateFailures ?? 0), 0),
     avgDuration: average(ended.map((c) => c.durationSec ?? 0)),
     outcomes: OUTCOME_ORDER.filter((o) => outcomes.has(o)).map((o) => [o, outcomes.get(o) ?? 0]),

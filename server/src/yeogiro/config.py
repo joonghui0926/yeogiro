@@ -30,6 +30,7 @@ class Settings:
     transfer_max_minutes: int = 180
     transfer_max_queries: int = 600
     transfer_timeout_seconds: float = 20
+    daily_call_limit: int = 100
 
 
 def load_settings() -> Settings:
@@ -61,4 +62,5 @@ def load_settings() -> Settings:
         transfer_max_minutes=int(os.environ.get("TRANSFER_MAX_MINUTES", "180")),
         transfer_max_queries=int(os.environ.get("TRANSFER_MAX_QUERIES", "600")),
         transfer_timeout_seconds=float(os.environ.get("TRANSFER_TIMEOUT_SECONDS", "20")),
+        daily_call_limit=int(os.environ.get("DAILY_CALL_LIMIT", "100")),
     )
