@@ -29,8 +29,8 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/screens/console/dark/02-overview-desktop.png">
-    <img src="docs/screens/console/light/02-overview-desktop.png" width="820" alt="운영 콘솔 개요 화면">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screens/live/console-overview-dark.png">
+    <img src="docs/screens/live/console-overview-light.png" width="820" alt="운영 콘솔 개요 화면">
   </picture>
 </p>
 
