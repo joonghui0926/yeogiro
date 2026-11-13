@@ -28,10 +28,11 @@
 열차 시간표와 운임은 실제 정보이고, 예약 번호와 결제는 모의로 처리합니다. 운영자는 콘솔에서 통화마다 대화, 도구 호출, 동의 판정을 그대로 다시 볼 수 있습니다.
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/screens/live/console-overview-dark.png">
-    <img src="docs/screens/live/console-overview-light.png" width="820" alt="운영 콘솔 개요 화면">
-  </picture>
+  <img src="docs/screens/live/console-overview.png" width="820" alt="운영 콘솔 개요 화면">
+</p>
+
+<p align="center">
+  <img src="docs/screens/live/console-call-detail.png" width="820" alt="통화 상세 화면. 대화, 도구 호출, 동의 판정">
 </p>
 
 <p align="center">
