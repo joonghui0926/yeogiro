@@ -13,7 +13,7 @@ class Train:
     departs_at: datetime
     arrives_at: datetime
     fare: int
-    seats_available: bool
+    seats_available: bool | None
 
     @property
     def duration(self) -> timedelta:
@@ -36,6 +36,7 @@ class TravelWindow:
 class Choice:
     train: Train
     sold_out_preferred: Train | None
+    itinerary: Itinerary | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +48,7 @@ class Proposal:
     fare_total: int
     sold_out_preferred: Train | None
     created_at: datetime
+    itinerary: Itinerary | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,3 +59,38 @@ class Hold:
     seat: str | None
     pay_by: datetime | None
     provider: str
+    itinerary: Itinerary | None = None
+    leg_holds: tuple[Hold, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class Itinerary:
+    legs: tuple[Train, ...]
+
+    def __post_init__(self) -> None:
+        if not 1 <= len(self.legs) <= 2:
+            raise ValueError("only direct and one-transfer itineraries are supported")
+        if any(t.duration <= timedelta() for t in self.legs):
+            raise ValueError("invalid train times")
+        if len(self.legs) == 2:
+            first, second = self.legs
+            if first.arr != second.dep or first.arrives_at >= second.departs_at:
+                raise ValueError("disconnected itinerary")
+
+    @property
+    def key(self) -> str:
+        return "|".join(t.key for t in self.legs)
+
+    @property
+    def duration(self) -> timedelta:
+        return self.legs[-1].arrives_at - self.legs[0].departs_at
+
+    @property
+    def fare(self) -> int | None:
+        return sum(t.fare for t in self.legs) if all(t.fare > 0 for t in self.legs) else None
+
+    @property
+    def wait_minutes(self) -> int:
+        if len(self.legs) == 1:
+            return 0
+        return int((self.legs[1].departs_at - self.legs[0].arrives_at).total_seconds() // 60)

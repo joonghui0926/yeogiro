@@ -26,6 +26,10 @@ class Settings:
     rail_hold_timeout: float
     assist_hold_timeout: float
     allowed_origins: tuple[str, ...]
+    transfer_min_minutes: int = 20
+    transfer_max_minutes: int = 180
+    transfer_max_queries: int = 600
+    transfer_timeout_seconds: float = 20
 
 
 def load_settings() -> Settings:
@@ -53,4 +57,8 @@ def load_settings() -> Settings:
         rail_hold_timeout=float(os.environ.get("RAIL_HOLD_TIMEOUT", "25")),
         assist_hold_timeout=float(os.environ.get("ASSIST_HOLD_TIMEOUT", "150")),
         allowed_origins=tuple(o.strip() for o in origins.split(",") if o.strip()),
+        transfer_min_minutes=int(os.environ.get("TRANSFER_MIN_MINUTES", "20")),
+        transfer_max_minutes=int(os.environ.get("TRANSFER_MAX_MINUTES", "180")),
+        transfer_max_queries=int(os.environ.get("TRANSFER_MAX_QUERIES", "600")),
+        transfer_timeout_seconds=float(os.environ.get("TRANSFER_TIMEOUT_SECONDS", "20")),
     )

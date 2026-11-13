@@ -7,7 +7,7 @@ import secrets
 from typing import Any
 
 import httpx
-from google.cloud import firestore
+from google.cloud import firestore_v1 as firestore
 
 from yeogiro.adapters.openai.realtime import RealtimeClient, RealtimeError
 from yeogiro.adapters.store.memory import DEMO_TESTER

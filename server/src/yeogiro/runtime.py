@@ -3,12 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import httpx
-from google.cloud import firestore
+from google.cloud import firestore_v1 as firestore
 
 from yeogiro.adapters.messaging.inbox import InAppMessenger
 from yeogiro.adapters.openai.consent_judge import OpenAIConsentJudge
 from yeogiro.adapters.openai.realtime import RealtimeClient
 from yeogiro.adapters.payment.mock_onetouch import MockOneTouch
+from yeogiro.adapters.rail.itineraries import TransferPolicy
 from yeogiro.adapters.rail.jobs import AssistRail, JobQueue, WorkerRail
 from yeogiro.adapters.rail.mock import MockRail
 from yeogiro.adapters.rail.router import RailRouter
@@ -59,6 +60,12 @@ def build_runtime(settings: Settings) -> Runtime:
             else None
         ),
         assist=AssistRail(queue, settings.assist_hold_timeout) if queue else None,
+        transfer_policy=TransferPolicy(
+            min_minutes=settings.transfer_min_minutes,
+            max_minutes=settings.transfer_max_minutes,
+            max_queries=settings.transfer_max_queries,
+            timeout_seconds=settings.transfer_timeout_seconds,
+        ),
     )
 
     realtime = RealtimeClient(settings.openai_api_key, http)

@@ -33,10 +33,10 @@ def choose_train(
         key=lambda t: _cost(t, center),
     )
     preferred = in_window[0] if in_window else min(bookable, key=lambda t: _cost(t, center))
-    if preferred.seats_available and not force_preferred_sold_out:
+    if preferred.seats_available is not False and not force_preferred_sold_out:
         return Choice(train=preferred, sold_out_preferred=None)
 
-    with_seats = [t for t in bookable if t.seats_available and t is not preferred]
+    with_seats = [t for t in bookable if t.seats_available is not False and t is not preferred]
     if not with_seats:
         return None
     alternative = min(with_seats, key=lambda t: _cost(t, preferred.departs_at))
@@ -52,7 +52,7 @@ def adjacent_train(
     pool = [
         t
         for t in trains
-        if t.seats_available and t.departs_at >= earliest_departure and t.key != current.key
+        if t.seats_available is not False and t.departs_at >= earliest_departure and t.key != current.key
     ]
     if direction == "later":
         later = [t for t in pool if t.departs_at > current.departs_at]
