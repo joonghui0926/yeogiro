@@ -20,13 +20,21 @@ def _cost(train: Train, anchor: datetime) -> float:
 
 
 def _asked_rank(train: Train, target: datetime, anchor: TimeAnchor) -> tuple[bool, float]:
-    """Order for a time the caller named: at or before it first, then the smallest gap.
+    """Order for a time the caller named: at or before it first, then the closest.
 
-    Many early trains never outrank one that is just before the asked time, and a train after
-    the asked time only comes up when nothing at or before it is bookable.
+    For an arrival time, "closest" among trains that make it is the one leaving latest, the way a
+    route planner answers "be there by four": a slow train that arrives a minute before four but
+    leaves an hour earlier loses to a KTX that leaves later and still arrives in time.
     """
-    moment = train.arrives_at if anchor == "arrives" else train.departs_at
-    return moment > target, abs((moment - target).total_seconds())
+    return _rank(train.departs_at, train.arrives_at, target, anchor)
+
+
+def _rank(departs: datetime, arrives: datetime, target: datetime, anchor: TimeAnchor) -> tuple[bool, float]:
+    moment = arrives if anchor == "arrives" else departs
+    late = moment > target
+    if anchor == "arrives" and not late:
+        return False, -departs.timestamp()
+    return late, abs((moment - target).total_seconds())
 
 
 def choose_train(
@@ -74,10 +82,7 @@ def choose_route(
         target = datetime.combine(window.day, window.asked, tzinfo=earliest_departure.tzinfo)
 
         def rank(route: Itinerary) -> tuple[bool, float]:
-            moment = (
-                route.legs[-1].arrives_at if window.anchor == "arrives" else route.legs[0].departs_at
-            )
-            return moment > target, abs((moment - target).total_seconds())
+            return _rank(route.legs[0].departs_at, route.legs[-1].arrives_at, target, window.anchor)
 
         return min(bookable, key=rank)
 
