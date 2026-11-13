@@ -101,16 +101,16 @@ class FirestoreStore:
     async def save_payment(self, payment_id: str, data: Mapping[str, Any]) -> None:
         await self._db.collection("payments").document(payment_id).set(dict(data), merge=True)
 
-    async def add_inbox_message(self, tester_id: str, message: InboxMessage) -> None:
-        inbox = self._db.collection("inbox").document(tester_id).collection("messages")
+    async def add_inbox_message(self, mailbox: str, message: InboxMessage) -> None:
+        inbox = self._db.collection("inbox").document(mailbox).collection("messages")
         await inbox.document(message.id).set(
             {"sender": message.sender, "body": message.body, "sentAt": message.sent_at}
         )
 
-    async def inbox(self, tester_id: str, limit: int = 50) -> list[InboxMessage]:
+    async def inbox(self, mailbox: str, limit: int = 50) -> list[InboxMessage]:
         query = (
             self._db.collection("inbox")
-            .document(tester_id)
+            .document(mailbox)
             .collection("messages")
             .order_by("sentAt", direction=firestore.Query.DESCENDING)
             .limit(limit)

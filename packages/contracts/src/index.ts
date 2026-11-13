@@ -40,6 +40,7 @@ export interface FirestoreTimestamp {
 export interface CallDoc {
   testerId: string
   testerLabel: string
+  deviceId?: string | null
   startedAt: FirestoreTimestamp
   endedAt?: FirestoreTimestamp
   status: 'live' | 'ended'

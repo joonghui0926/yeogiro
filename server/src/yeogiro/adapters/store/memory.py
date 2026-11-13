@@ -51,8 +51,8 @@ class MemoryStore:
     async def save_payment(self, payment_id: str, data: Mapping[str, Any]) -> None:
         self.payments.setdefault(payment_id, {}).update(data)
 
-    async def add_inbox_message(self, tester_id: str, message: InboxMessage) -> None:
-        self.messages[tester_id].append(message)
+    async def add_inbox_message(self, mailbox: str, message: InboxMessage) -> None:
+        self.messages[mailbox].append(message)
 
-    async def inbox(self, tester_id: str, limit: int = 50) -> list[InboxMessage]:
-        return self.messages[tester_id][-limit:]
+    async def inbox(self, mailbox: str, limit: int = 50) -> list[InboxMessage]:
+        return self.messages[mailbox][-limit:]

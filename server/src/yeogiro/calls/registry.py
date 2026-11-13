@@ -15,9 +15,16 @@ class CallRegistry:
     def get(self, call_id: str) -> CallSession | None:
         return self._sessions.get(call_id)
 
-    def live_for(self, tester_id: str) -> CallSession | None:
+    def live_on(self, tester_id: str, device: str) -> CallSession | None:
+        """The call already running on this phone. Other phones on the same tester keep theirs."""
         return next(
-            (s for s in self._sessions.values() if s.tester.id == tester_id and not s.closed),
+            (s for s in self.live() if s.tester.id == tester_id and s.device == device),
+            None,
+        )
+
+    def awaiting(self, tester_id: str, payment_id: str) -> CallSession | None:
+        return next(
+            (s for s in self.live() if s.tester.id == tester_id and s.payment_id == payment_id),
             None,
         )
 
