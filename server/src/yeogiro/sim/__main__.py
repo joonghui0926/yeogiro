@@ -133,6 +133,23 @@ async def _until_quiet(session: CallSession, card: dict[str, Any]) -> None:
         await asyncio.sleep(0.1)
 
 
+def _speech_checks(events: list[dict[str, Any]], expect: dict[str, Any]) -> list[bool]:
+    """Which tools the model chose and what it said, for cards about wording and intent."""
+    calls = [e for e in events if e["kind"] == "tool_call"]
+    names = {e["name"] for e in calls}
+    said = [e for e in events if e["kind"] == "ai"]
+    checks = [name in names for name in expect.get("tools", [])]
+    checks += [name not in names for name in expect.get("no_tools", [])]
+    if "after" in expect:
+        rule = expect["after"]
+        start = next((e["t"] for e in calls if e["name"] == rule["tool"]), None)
+        later = [e["text"] for e in said if start is not None and e["t"] > start]
+        checks.append(start is not None and not any(p in t for t in later for p in rule["never_say"]))
+    if "last_ai" in expect:
+        checks.append(bool(said) and expect["last_ai"] in said[-1]["text"])
+    return checks
+
+
 def render(result: dict[str, Any]) -> tuple[str, bool]:
     card = result["card"]
     out = [f"\n━━ 카드 {card['id']} · {card['name']}", f"   {card.get('why', '')}"]
@@ -167,6 +184,7 @@ def render(result: dict[str, Any]) -> tuple[str, bool]:
         checks.append(result["outcome"] != expect["not_outcome"])
     if "max_reasks" in expect:
         checks.append(result["reasks"] <= expect["max_reasks"])
+    checks.extend(_speech_checks(result["events"], expect))
     passed = all(checks)
     if not passed or card.get("trace"):
         out.extend(f"         {line}" for line in result["trace"])

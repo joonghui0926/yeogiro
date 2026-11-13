@@ -104,6 +104,7 @@ export type CallEvent = EventBase &
     | { kind: 'payment'; status: 'requested' | 'approved' | 'expired'; amount?: number }
     | { kind: 'message'; body: string }
     | { kind: 'cancel'; reason: string; provider: string }
+    | { kind: 'trip_dropped'; heard: string; released: boolean }
     | { kind: 'interrupt' }
     | { kind: 'silence'; action: 'nudge' | 'hangup' }
     | { kind: 'error'; where: string; message: string }
