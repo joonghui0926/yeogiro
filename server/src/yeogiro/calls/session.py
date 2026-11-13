@@ -173,12 +173,14 @@ class CallSession:
         self._gate_failures = 0
         self._outcome = "abandoned"
         self._rail_source = ""
+        self._trip_dropped = False
 
         self._tools: dict[str, ToolHandler] = {
             "find_trains": self._find_trains,
             "set_senior": self._set_senior,
             "request_booking": self._request_booking,
             "cancel_booking": self._cancel_booking,
+            "drop_trip": self._drop_trip,
             "speak_slower": self._speak_slower,
             "end_call": self._end_call,
         }
@@ -381,6 +383,7 @@ class CallSession:
         await self._respond(items=[output])
 
     async def _find_trains(self, args: dict[str, Any]) -> dict[str, Any]:
+        self._trip_dropped = False
         shift = args.get("shift")
         if shift in ("earlier", "later") and self._current is not None:
             return await self._find_adjacent(shift)
@@ -490,7 +493,7 @@ class CallSession:
             "source": self._rail_source,
         }
 
-    async def _request_booking(self, args: dict[str, Any]) -> dict[str, Any]:
+    async def _request_booking(self, args: dict[str, Any]) -> dict[str, Any] | None:
         option_id = str(args.get("option_id", ""))
         proposal = self._options.get(option_id)
         now = datetime.now(KST)
@@ -552,6 +555,8 @@ class CallSession:
         done, _ = await asyncio.wait({securing}, timeout=QUICK_HOLD_SECONDS)
         if securing in done:
             secured: Secured = securing.result()
+            if not secured.say:
+                return None
             return {"ok": secured.ok, "say": secured.say}
         self._spawn(self._announce_when_secured(securing))
         return {"ok": True, "status": "waiting", "say": lines.HOLDING}
@@ -622,6 +627,11 @@ class CallSession:
         }
         self._log("hold", **summary)
         self._write(self._deps.store.update_call(self.call_id, {"booking": summary}))
+        if self._trip_dropped:
+            # The caller said they no longer want to go while the seat was being secured.
+            await self._release_hold("caller_dropped_trip")
+            self._outcome = "cancelled"
+            return Secured(ok=False, say="")
 
         train = hold.train
         payment = await self._deps.payments.request(
@@ -658,8 +668,9 @@ class CallSession:
             if waited >= next_filler and not securing.done():
                 await self._say(lines.HOLDING_STILL)
                 next_filler += WAIT_FILLER_EVERY_SECONDS
-        if not self.closed:
-            await self._say(securing.result().say)
+        say = securing.result().say
+        if not self.closed and say:
+            await self._say(say)
 
     async def _await_payment(self, hold: Hold, payment: PaymentRequest) -> None:
         waited = 0.0
@@ -667,12 +678,12 @@ class CallSession:
         for at, reminder in PAYMENT_REMINDERS:
             approved = await self._deps.payments.wait(payment.id, at - waited)
             waited = at
-            if approved or self.closed:
+            if approved or self._payment_gone(payment):
                 break
             await self._say(reminder)
-        if not approved and not self.closed:
+        if not approved and not self._payment_gone(payment):
             approved = await self._deps.payments.wait(payment.id, PAYMENT_GIVE_UP_SECONDS - waited)
-        if self.closed:
+        if self._payment_gone(payment):
             return
         if not approved:
             await self._deps.payments.expire(payment.id)
@@ -696,15 +707,46 @@ class CallSession:
             speech.ticket_message(hold, self._current.party if self._current else 1)
         )
 
+    def _payment_gone(self, payment: PaymentRequest) -> bool:
+        """True once the call ended or the payment was withdrawn (cancelled or trip dropped)."""
+        return self.closed or self._payment_id != payment.id
+
+    async def _withdraw_payment(self) -> None:
+        payment_id, self._payment_id = self._payment_id, None
+        if payment_id:
+            await self._deps.payments.expire(payment_id)
+            self._emit({"type": "payment.expired", "paymentId": payment_id})
+
     async def _cancel_booking(self, args: dict[str, Any]) -> dict[str, Any]:
         if self._hold is None or self._booking is None or self._booking.status == "cancelled":
             return {"ok": False, "say": lines.NOTHING_TO_CANCEL}
-        if self._payment_id:
-            await self._deps.payments.expire(self._payment_id)
+        await self._withdraw_payment()
         await self._release_hold("caller_request")
         self._outcome = "cancelled"
         self._enter(CallState.LISTENING)
         return {"ok": True, "say": lines.CANCELLED}
+
+    async def _drop_trip(self, args: dict[str, Any]) -> dict[str, Any]:
+        """The caller no longer wants to travel: clear everything and ask if anything else is needed."""
+        self._trip_dropped = True
+        held = self._booking is not None and self._booking.status != "cancelled"
+        await self._withdraw_payment()
+        await self._release_hold("caller_dropped_trip")
+        if held:
+            self._outcome = "cancelled"
+        elif self._outcome == "abandoned":
+            self._outcome = "declined"
+        self._current = None
+        self._pending_choice = None
+        self._proposal_short = ""
+        self._expect_proposal = False
+        self._log("trip_dropped", heard=str(args.get("heard") or ""), released=held)
+        self._enter(CallState.LISTENING)
+        return {
+            "ok": True,
+            "say": lines.TRIP_DROPPED,
+            "next": f'더 필요한 게 없다고 하면 "{lines.THANKS_GOODBYE}" 한 문장만 말하고 end_call',
+        }
 
     async def _speak_slower(self, args: dict[str, Any]) -> dict[str, Any]:
         if self._channel is not None:
@@ -727,9 +769,10 @@ class CallSession:
     async def _say_goodbye_and_end(self) -> None:
         with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(self._idle.wait(), timeout=12)
-        if lines.GOODBYE not in self._last_ai_text:
+        farewell = lines.THANKS_GOODBYE if self._trip_dropped else lines.GOODBYE
+        if farewell not in self._last_ai_text:
             self._log("goodbye", added=True)
-            await self._say(lines.GOODBYE)
+            await self._say(farewell)
         await self._end_after_speech()
 
     async def _release_hold(self, reason: str) -> None:
@@ -866,7 +909,7 @@ class CallSession:
     def _is_reask(self, text: str) -> bool:
         return (
             text.rstrip().endswith("?")
-            and text != lines.GREETING
+            and text not in (lines.GREETING, lines.TRIP_DROPPED)
             and self.state in (CallState.LISTENING, CallState.SEARCHING)
         )
 

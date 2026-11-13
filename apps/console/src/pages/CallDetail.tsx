@@ -356,6 +356,9 @@ function toItems(events: WithId<CallEvent>[]): Item[] {
       case 'cancel':
         items.push({ type: 'mark', key, t: event.t, tone: 'warn', text: `예약 취소 · ${cancelLabel(event.reason)}` })
         break
+      case 'trip_dropped':
+        items.push({ type: 'mark', key, t: event.t, tone: 'warn', text: `안 가기로 함${event.heard ? ` · “${event.heard}”` : ''}` })
+        break
       case 'interrupt':
         items.push({ type: 'mark', key, t: event.t, tone: 'plain', text: '어르신이 말을 끊음' })
         break
@@ -400,6 +403,6 @@ function providerLabel(provider: string): string {
 
 function cancelLabel(reason: string): string {
   return (
-    { call_ended: '통화 종료 후 자동', caller_request: '어르신 요청', payment_timeout: '결제 안 함' }[reason] ?? reason
+    { call_ended: '통화 종료 후 자동', caller_request: '어르신 요청', caller_dropped_trip: '어르신이 안 가기로 함', payment_timeout: '결제 안 함' }[reason] ?? reason
   )
 }

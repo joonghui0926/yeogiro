@@ -80,6 +80,20 @@ CANCEL_BOOKING: dict[str, Any] = {
     "parameters": {"type": "object", "properties": {}},
 }
 
+DROP_TRIP: dict[str, Any] = {
+    "type": "function",
+    "name": "drop_trip",
+    "description": (
+        "어르신이 기차를 타고 가는 것 자체를 그만두겠다고 할 때 부른다"
+        "(가기 싫어졌어, 안 갈래, 안 가). 통화 중 어느 단계든 부를 수 있고, "
+        "잡아 둔 자리와 결제 요청도 함께 정리한다. 시간·날짜·역을 바꾸려는 말에는 부르지 않는다."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {"heard": {"type": "string", "description": "어르신이 말한 원래 표현"}},
+    },
+}
+
 END_CALL: dict[str, Any] = {
     "type": "function",
     "name": "end_call",
@@ -99,6 +113,7 @@ TOOLS: list[dict[str, Any]] = [
     SET_SENIOR,
     REQUEST_BOOKING,
     CANCEL_BOOKING,
+    DROP_TRIP,
     SPEAK_SLOWER,
     END_CALL,
 ]

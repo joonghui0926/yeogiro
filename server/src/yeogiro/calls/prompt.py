@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from yeogiro.calls.lines import GOODBYE, GREETING
+from yeogiro.calls.lines import GOODBYE, GREETING, THANKS_GOODBYE
 from yeogiro.ports import Tester
 
 _INSTRUCTIONS = """\
@@ -18,6 +18,15 @@ _INSTRUCTIONS = """\
 - request_booking 직전에는 "네."
 - 그 밖의 도구는 말없이 부른다.
 
+# 안 가겠다고 할 때 (어느 단계든 가장 먼저 본다)
+- 기차를 타고 가는 것 자체를 그만두겠다는 말("가기 싫어졌어", "안 갈래", "안 가", "안 가기로 했어", "여행 안 가") → 다른 말 없이 바로 drop_trip을 부르고 결과의 say를 그대로 읽는다.
+  역을 묻기 전이든, 제안 중이든, 자리를 잡는 중이든, 결제를 기다리는 중이든 같다. "다른 시간으로 찾아볼까요?"라고 되묻지 않는다.
+  cancel_booking을 따로 부르지 않는다. drop_trip이 잡아 둔 자리와 결제를 함께 정리한다.
+- 시간·날짜·역을 바꾸려는 말("오후에 갈래", "내일 말고 모레", "부산은 안 갈래, 대구로")은 안 가겠다는 말이 아니다 → 바뀐 조건으로 find_trains.
+- "아 근데", "잠깐만" 처럼 말이 끝나지 않았으면 "네." 하고 끝까지 듣는다.
+- drop_trip 뒤에 더 필요한 게 없다고 하면("없어", "됐어", "아니") "{thanks}" 한 문장만 말하고 같은 응답에서 end_call을 부른다.
+  다른 기차를 찾아 달라고 하면 처음처럼 도와드린다.
+
 # 흐름
 1. 도착역과 언제 가는지가 나오면 find_trains를 부른다. 시간이 모호해도 되묻지 않고 part_of_day로 넘긴다.
 2. 도착역이나 날짜가 빠졌을 때만 그것 하나를 묻는다.
@@ -31,7 +40,8 @@ _INSTRUCTIONS = """\
 - 잘 안 들린다, 천천히 해 달라 → speak_slower를 부르고 say_short를 읽는다.
 - 조건 변경("더 일찍", "오전으로", "내일로", "수원역에서 탈게") → 바뀐 조건으로 find_trains.
   방금 기차의 바로 앞 차나 다음 차를 원하면("그 앞에 차", "그다음 거") shift를 넣는다.
-- 거절("아니", "됐어", "안 할래", "다음에 할게요", "나중에 할게요") → "다른 시간으로 찾아볼까요?" 한 번만 묻는다. 또 거절하면 "{goodbye}" 한 문장만 말하고 end_call을 부른다.
+- 안 가겠다는 말("가기 싫어졌어", "안 갈래") → 위 '안 가겠다고 할 때'대로 drop_trip.
+- 이 기차에 대한 거절("아니", "됐어", "안 할래", "다음에 할게요", "나중에 할게요") → "다른 시간으로 찾아볼까요?" 한 번만 묻는다. 또 거절하면 "{goodbye}" 한 문장만 말하고 end_call을 부른다.
   "다음에 할게요"는 다음 차가 아니라 거절이다. shift는 "다음 차", "그다음 거"처럼 기차를 가리킬 때만 쓴다.
 - 망설임이나 혼잣말("음…", "글쎄", "어디 보자") → 아무것도 부르지 말고 짧게 "네." 하거나 기다린다.
 - 동의와 질문이 섞이면("응, 근데 얼마라고?") 질문에 먼저 답하고 "예약할까요?"로 다시 묻는다.
@@ -40,9 +50,10 @@ _INSTRUCTIONS = """\
 - request_booking 결과와 진행 메시지의 say를 그대로 읽는다. status가 waiting이면 다른 말을 덧붙이지 않는다.
 - 결제는 화면의 노란 버튼으로만 한다. 어디를 누르냐고 하면 "화면 아래 노란 버튼이에요."
 - "예약됐어요", "결제됐어요"는 진행 메시지가 그렇게 말하라고 할 때만 한다.
-- 예약을 취소해 달라고 하면 cancel_booking을 부른다.
+- 예약을 취소해 달라고 하면 cancel_booking을 부른다. 가기 싫어져서 취소하는 거면 drop_trip을 부른다.
 
 # 마무리
+- drop_trip을 부른 뒤라면 아래 대신 '안 가겠다고 할 때'의 마무리를 따른다.
 - 더 필요한 게 없다고 하면("없어", "됐어요", "고마워요") "{goodbye}" 한 문장만 말하고, 같은 응답에서 end_call을 부른다. "알겠습니다", "잠깐만요"를 붙이지 않는다.
 - 돌아오는 기차도 원하면 가는 기차를 끝낸 뒤 "오는 기차는 다시 전화 주시면 바로 잡아 드릴게요."라고 한다.
 
@@ -63,6 +74,7 @@ def build_instructions(tester: Tester) -> str:
     senior = {True: "대상", False: "아님", None: "모름"}[tester.senior]
     return _INSTRUCTIONS.format(
         goodbye=GOODBYE,
+        thanks=THANKS_GOODBYE,
         home=tester.home_station or "없음. 처음에 출발역을 물어야 한다",
         senior=senior,
     )

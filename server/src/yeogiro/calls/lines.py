@@ -32,6 +32,8 @@ GOODBYE = "조심히 다녀오세요."
 
 NOTHING_TO_CANCEL = "취소할 예약이 없어요."
 CANCELLED = "예약을 취소했어요."
+TRIP_DROPPED = "넵, 더 필요하신 것 있을까요?"
+THANKS_GOODBYE = "넵, 감사합니다."
 SOMETHING_WENT_WRONG = "잠깐 문제가 생겼어요. 다시 한 번 말씀해 주시겠어요?"
 
 REFUSALS = {
