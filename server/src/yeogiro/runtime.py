@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -21,7 +22,8 @@ from yeogiro.adapters.store.memory import MemoryStore
 from yeogiro.calls.registry import CallRegistry
 from yeogiro.calls.session import CallDeps
 from yeogiro.config import KST, Settings
-from yeogiro.ports import RailProvider, Store
+from yeogiro.domain import stations
+from yeogiro.ports import RailProvider, RailUnavailable, Store
 
 
 @dataclass(slots=True)
@@ -34,6 +36,7 @@ class Runtime:
     deps: CallDeps
     registry: CallRegistry
     runs: KorailRuns | None = None
+    tago: TagoTimetable | None = None
     calls_by_day: dict[str, int] = field(default_factory=dict)
 
     def take_call(self) -> bool:
@@ -46,6 +49,10 @@ class Runtime:
         return True
 
     async def warm(self) -> None:
+        if self.tago is not None:
+            # Every station TAGO knows becomes speakable, beyond the bundled list.
+            with contextlib.suppress(RailUnavailable):
+                stations.register(await self.tago.station_names())
         if self.runs is not None:
             await self.runs.warm(datetime.now(KST).date())
 
@@ -65,9 +72,8 @@ def build_runtime(settings: Settings) -> Runtime:
         queue = JobQueue(db)
 
     mock = MockRail()
-    timetable: RailProvider = (
-        TagoTimetable(settings.tago_service_key, http) if settings.tago_service_key else mock
-    )
+    tago = TagoTimetable(settings.tago_service_key, http) if settings.tago_service_key else None
+    timetable: RailProvider = tago or mock
     runs = (
         KorailRuns(
             settings.tago_service_key, http, timedelta(minutes=settings.transfer_min_minutes)
@@ -113,4 +119,5 @@ def build_runtime(settings: Settings) -> Runtime:
         deps=deps,
         registry=CallRegistry(),
         runs=runs,
+        tago=tago,
     )
