@@ -196,6 +196,8 @@ def args() -> dict[str, Any]:
     return {
         "departure": "대전",
         "arrival": "강릉",
+        # 대전 sounds like 대천, so the caller has already confirmed it.
+        "confirmed_stations": ["대전"],
         "relative_day": "date",
         "month": DAY.month,
         "day_of_month": DAY.day,
@@ -222,8 +224,9 @@ async def test_transfer_reaches_voice_consent_booking_payment_and_message(
     result = await session._find_trains({**args(), "relative_day": "tomorrow"})
     assert result["status"] == "transfer_found"
     assert result["itinerary"]["legs"][1]["arr"] == "강릉"
-    assert result["say"].startswith("바로 가는 기차가 없어요.")
-    assert "한 번 갈아타요" in result["say"] and "101" not in result["say"]
+    assert result["say"].startswith("바로 가는 기차가 없어서 한 번 갈아타셔야 해요.")
+    assert "에서 내리세요" in result["say"] and "기차로 갈아타면" in result["say"]
+    assert "표는 두 장" in result["say"] and "101" not in result["say"]
     assert "갈아타서" in result["say_short"] and result["say"].endswith("예약할까요?")
     assert "확인 안 됨" not in result["facts"]["요금"]
     assert result["facts"]["구간"] == "대전에서 강릉"
@@ -336,11 +339,13 @@ async def test_next_day_speech_and_senior_fares_follow_each_leg_date() -> None:
     session, _ = call_session(Timetable([first, second]))
     session._senior = True
     result = session._propose(Choice(first, None, Itinerary((first, second))), 2)
-    assert "21일 토요일 새벽 한 시 삼십 분 강릉 도착" in result["say"]
+    assert "21일 토요일 새벽 한 시 삼십 분에 강릉에 도착해요" in result["say"]
+    # The second train leaves after midnight, so its own date is read too.
+    assert "21일 토요일 새벽 열두 시 삼십 분 기차로 갈아타면" in result["say"]
     assert result["train"]["fareTotal"] == 37000  # Friday: 7,000+10,000; Saturday: 20,000.
     assert fares.fare_total(first, 2, True) == 17000
     assert "21일" in result["facts"]["도착"]
-    assert "중간역에서 기다렸다가" not in result["say"]
+    assert "중간역에서 내리세요. 중간역에서 한 시간 기다렸다가" in result["say"]
     assert "21일" in speech.route_description(Itinerary((first, second)))
     await session.hangup("caller")
 
@@ -380,12 +385,12 @@ async def test_explicit_transfer_selection_and_later_journey_keep_final_destinat
     ]
     session, _ = call_session(Timetable(trains))
     direct = await session._find_trains(
-        {"arrival": "강릉", "relative_day": "tomorrow", "include_transfers": True}
+        {**args(), "relative_day": "tomorrow", "include_transfers": True}
     )
     assert direct["status"] == "direct_found"
     assert any(r["kind"] == "transfer" for r in direct["alternatives"])
     transfer = await session._find_trains(
-        {"arrival": "강릉", "relative_day": "tomorrow", "prefer_transfer": True}
+        {**args(), "relative_day": "tomorrow", "prefer_transfer": True}
     )
     assert transfer["status"] == "transfer_found" and transfer["train"]["trainNo"] == "101"
     later = await session._find_trains({"shift": "later"})

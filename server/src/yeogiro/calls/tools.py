@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from yeogiro.domain.stations import STATIONS
 from yeogiro.domain.when import WEEKDAYS, PartOfDay, RelativeDay
 
 FIND_TRAINS: dict[str, Any] = {
     "type": "function",
     "name": "find_trains",
-    "description": "어르신이 말한 조건으로 열차를 찾아 하나를 제안한다. 결과의 say를 그대로 읽는다.",
+    "description": (
+        "어르신이 말한 조건으로 열차를 찾아 하나를 제안한다. 역만 들었어도 불러서 역을 확인받는다. "
+        "need가 있으면 그 say 질문만 하고, 없으면 제안 say를 그대로 읽는다."
+    ),
     "parameters": {
         "type": "object",
         "properties": {
@@ -20,11 +22,24 @@ FIND_TRAINS: dict[str, Any] = {
                 "type": "boolean",
                 "description": "직통편이 있어도 환승 대안을 함께 찾을 때 true",
             },
-            "arrival": {"type": "string", "enum": list(STATIONS), "description": "도착역"},
             "departure": {
                 "type": "string",
-                "enum": list(STATIONS),
-                "description": "어르신이 출발역을 말했을 때만 넣는다",
+                "description": (
+                    "출발역. 어르신이 말한 역 이름을 그대로 넣는다('역'은 빼도 된다). "
+                    "비슷한 역으로 바꾸거나 짐작해서 채우지 않는다. 듣지 못했으면 비운다"
+                ),
+            },
+            "arrival": {
+                "type": "string",
+                "description": "도착역. 어르신이 말한 역 이름 그대로. 듣지 못했으면 비운다",
+            },
+            "confirmed_stations": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "역 확인 질문(need가 confirm_station)에 어르신이 맞다고 하거나 고른 역 이름. "
+                    "candidates에 있는 이름 그대로 넣고, 그 역을 departure나 arrival에도 넣는다"
+                ),
             },
             "relative_day": {
                 "type": "string",
@@ -65,7 +80,7 @@ FIND_TRAINS: dict[str, Any] = {
             },
             "heard": {"type": "string", "description": "어르신이 말한 원래 표현"},
         },
-        "required": ["arrival", "relative_day", "part_of_day"],
+        "required": [],
     },
 }
 

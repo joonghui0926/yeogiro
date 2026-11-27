@@ -22,7 +22,8 @@ from yeogiro.config import KST
 from yeogiro.domain import consent, fares, speech
 from yeogiro.domain.models import Choice, Hold, Itinerary, Proposal
 from yeogiro.domain.selection import adjacent_train, choose_route, choose_train
-from yeogiro.domain.stations import is_supported
+from yeogiro.domain.stations import is_supported, normalize
+from yeogiro.domain.stations import match as match_station
 from yeogiro.domain.when import BOOKING_LEAD, PartOfDay, RelativeDay, resolve_day, resolve_window
 from yeogiro.ports import (
     BookingRecord,
@@ -176,6 +177,8 @@ class CallSession:
         self._rail_source = ""
         self._trip_dropped = False
         self._search_details: dict[str, Any] = {}
+        # Stations the caller has confirmed in this call, so the same question is asked once.
+        self._confirmed_stations: set[str] = set()
         self._tickets_sent: set[str] = set()
         self._bookings_made = 0
         self._proposal_spoken = ""
@@ -422,12 +425,18 @@ class CallSession:
         if shift in ("earlier", "later") and self._current is not None:
             return await self._find_adjacent(shift)
 
-        departure = args.get("departure") or self.tester.home_station
-        arrival = args.get("arrival")
-        if not departure or not is_supported(departure):
-            return {"need": "departure", "say": lines.ASK_DEPARTURE}
-        if not isinstance(arrival, str) or not is_supported(arrival) or arrival == departure:
-            return {"need": "arrival", "say": lines.ASK_ARRIVAL}
+        for confirmed in args.get("confirmed_stations") or ():
+            if isinstance(confirmed, str) and is_supported(normalize(confirmed)):
+                self._confirmed_stations.add(normalize(confirmed))
+        # The departure station is always the caller's own word: no default station.
+        departure, asking = self._station("departure", args.get("departure"))
+        if asking is not None:
+            return asking
+        arrival, asking = self._station("arrival", args.get("arrival"))
+        if asking is not None:
+            return asking
+        if arrival == departure:
+            return {"need": "arrival", "say": lines.SAME_STATION}
 
         now = datetime.now(KST)
         day = resolve_day(
@@ -482,6 +491,7 @@ class CallSession:
             routes.sort(key=lambda r: abs((r.legs[0].departs_at - anchor).total_seconds()))
         self._search_details = {
             "direct_found": result.direct_found,
+            "transfer_asked": args.get("prefer_transfer") is True,
             "search_complete": result.complete,
             "api_failed": result.api_failed,
             "alternatives": [
@@ -541,6 +551,25 @@ class CallSession:
             self._enter(CallState.LISTENING)
             return {"need": "senior", "say": lines.ASK_SENIOR}
         return self._propose(choice, party)
+
+    def _station(self, side: str, heard: Any) -> tuple[str, dict[str, Any] | None]:
+        """The station the caller meant, or the question to ask before searching."""
+        if not isinstance(heard, str) or not heard.strip():
+            ask = lines.ASK_DEPARTURE if side == "departure" else lines.ASK_ARRIVAL
+            return "", {"need": side, "say": ask}
+        found = match_station(heard)
+        if found.station and (found.certain or found.station in self._confirmed_stations):
+            self._confirmed_stations.add(found.station)
+            return found.station, None
+        if not found.candidates:
+            return "", {"need": side, "say": lines.STATION_NOT_FOUND[side]}
+        self._log("station_confirm", side=side, heard=heard[:40], candidates=list(found.candidates))
+        return "", {
+            "need": "confirm_station",
+            "side": side,
+            "candidates": list(found.candidates),
+            "say": speech.confirm_station(side, found.candidates, one=found.station is not None),
+        }
 
     async def _find_adjacent(self, direction: Literal["earlier", "later"]) -> dict[str, Any]:
         current = self._current
@@ -630,10 +659,16 @@ class CallSession:
         self._proposal_say = speech.proposal_sentence(proposal, now.date(), discounted)
         if (
             len(route.legs) > 1
-            and not self._search_details.get("direct_found")
             and not self._search_details.get("api_failed")
+            and not self._search_details.get("transfer_asked")
         ):
-            self._proposal_say = "바로 가는 기차가 없어요. " + self._proposal_say
+            # Say why a transfer comes up: no direct train at all, or none around that time.
+            reason = (
+                "그 시간엔 바로 가는 기차가 없어서"
+                if self._search_details.get("direct_found")
+                else "바로 가는 기차가 없어서"
+            )
+            self._proposal_say = f"{reason} 한 번 갈아타셔야 해요. " + self._proposal_say
         self._proposal_short = speech.reconfirm_route(route, proposal.by_arrival)
         self._expect_proposal = True
         self._consent_misses = 0
@@ -888,7 +923,7 @@ class CallSession:
         if self._booking is not None:
             self._booking.status = "paid"
             await self._deps.store.save_booking(self._booking)
-        await self._say(lines.PAID)
+        await self._say(lines.PAID_TRANSFER if hold.leg_holds else lines.PAID)
         await asyncio.sleep(SMS_DELAY_SECONDS)
         await self._send_ticket(hold)
 

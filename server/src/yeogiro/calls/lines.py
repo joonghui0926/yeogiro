@@ -3,10 +3,15 @@
 Sentences the model composes on its own are limited to answers built from tool facts.
 """
 
-GREETING = "여기로 기차 예약 AI예요. 어디로, 언제 출발하세요?"
+GREETING = "여기로 기차 예약 AI예요. 어디서 출발해서 어디로 가세요?"
 
-ASK_DEPARTURE = "어디서 타세요?"
-ASK_ARRIVAL = "어디로 가세요?"
+ASK_DEPARTURE = "어느 역에서 타세요?"
+ASK_ARRIVAL = "어느 역으로 가세요?"
+STATION_NOT_FOUND = {
+    "departure": "타시는 역을 찾지 못했어요. 역 이름을 한 번 더 말씀해 주시겠어요?",
+    "arrival": "가시는 역을 찾지 못했어요. 역 이름을 한 번 더 말씀해 주시겠어요?",
+}
+SAME_STATION = "타시는 역과 가시는 역이 같아요. 어느 역으로 가세요?"
 ASK_DATE = "언제 출발하세요?"
 ASK_SENIOR = "만 65세 넘으셨어요?"
 
@@ -26,6 +31,9 @@ PAY_REMINDER = "전화기를 귀에서 떼고, 화면 아래 노란 버튼을 �
 PAY_REMINDER_LAST = "노란 버튼만 누르시면 끝나요."
 PAY_EXPIRED = "결제가 안 돼서 자리는 풀어 둘게요. 다시 전화 주시면 도와드릴게요."
 PAID = "결제됐어요. 문자로 표 보내드렸어요. 더 필요하신 거 있으세요?"
+PAID_TRANSFER = (
+    "결제됐어요. 갈아타는 기차까지 표 두 장을 문자로 보내드렸어요. 더 필요하신 거 있으세요?"
+)
 
 NOT_CONFIRMED_TWICE = "열차 정보만 문자로 보내드릴게요. 더 필요하신 거 있으세요?"
 NUDGE = "천천히 말씀하셔도 돼요."
